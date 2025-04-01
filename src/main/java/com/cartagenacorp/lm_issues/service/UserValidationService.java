@@ -2,13 +2,13 @@ package com.cartagenacorp.lm_issues.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -24,33 +24,45 @@ public class UserValidationService {
         this.restTemplate = restTemplate;
     }
 
-    public UUID authenticateUser(String email) {
+    public boolean userExists(UUID userId, String token) {
         try {
-            String loginUrl = authServiceUrl + "/login";
-            Map<String, String> request = new HashMap<>();
-            request.put("email", email);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<Map> response = restTemplate.postForEntity(loginUrl, request, Map.class);
+            ResponseEntity<Boolean> response = restTemplate.exchange(
+                    authServiceUrl + "/validate/" + userId,
+                    HttpMethod.GET,
+                    entity,
+                    Boolean.class
+            );
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return UUID.fromString(response.getBody().get("id").toString());
-            } else {
-                throw new RuntimeException("Authentication error");
-            }
+            return response.getBody() != null && response.getBody();
         } catch (Exception e) {
-            throw new RuntimeException("Error connecting to the authentication service: " + e.getMessage());
-        }
-    }
-
-    public boolean userExists(UUID userId) {
-        try {
-            String url = authServiceUrl + "/auth/" + userId;
-            ResponseEntity<Void> response = restTemplate.getForEntity(url, Void.class);
-
-            return response.getStatusCode().is2xxSuccessful();
-        } catch (HttpClientErrorException.NotFound e) {
+            System.out.println("Error validating user: " + e.getMessage());
             return false;
         }
     }
-}
 
+    public UUID getUserIdFromToken(String token) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    authServiceUrl + "/token",
+                    HttpMethod.GET,
+                    entity,
+                    String.class
+            );
+
+            if (response.getBody() != null) {
+                return UUID.fromString(response.getBody());
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+}

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,32 +43,139 @@ public class IssueController {
     }
 
     @PostMapping
-    public ResponseEntity<IssueDTO> createIssue(@RequestBody IssueDTO issueDTO, @RequestParam String email) {
-        IssueDTO createdIssue = issueService.createIssue(issueDTO, email);
-        return new ResponseEntity<>(createdIssue, HttpStatus.CREATED);
+    public ResponseEntity<?> createIssue(
+            @RequestBody IssueDTO issueDTO,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String token = authHeader.substring(7);
+        try {
+            IssueDTO createdIssue = issueService.createIssue(issueDTO, token);
+            return new ResponseEntity<>(createdIssue, HttpStatus.CREATED);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
+        }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<IssueDTO> updateIssue(@PathVariable UUID id, @RequestBody IssueDTO issueDTO) {
-        IssueDTO updatedIssue = issueService.updateIssue(id, issueDTO);
-        return ResponseEntity.ok(updatedIssue);
+    public ResponseEntity<?> updateIssue(
+            @PathVariable UUID id,
+            @RequestBody IssueDTO issueDTO,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+            IssueDTO updatedIssue = issueService.updateIssue(id, issueDTO, token);
+            return ResponseEntity.ok(updatedIssue);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteIssue(@PathVariable UUID id) {
-        issueService.deleteIssue(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteIssue(
+            @PathVariable UUID id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+            issueService.deleteIssue(id, token);
+            return ResponseEntity.noContent().build();
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
+        }
     }
 
     @PatchMapping("/reopen/{id}")
-    public ResponseEntity<IssueDTO> reopenIssue(@PathVariable UUID id) {
-        IssueDTO reopenedIssue = issueService.reopenIssue(id);
-        return ResponseEntity.ok(reopenedIssue);
+    public ResponseEntity<?> reopenIssue(
+            @PathVariable UUID id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+            IssueDTO reopenedIssue = issueService.reopenIssue(id, token);
+            return ResponseEntity.ok(reopenedIssue);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
+        }
     }
 
     @PatchMapping("/assignUser/{id}")
-    public ResponseEntity<IssueDTO> assignUsersToIssue(@PathVariable UUID id, @RequestBody(required = false) UUID userId) {
-        IssueDTO updatedIssue = issueService.assignUserToIssue(id, userId);
-        return ResponseEntity.ok(updatedIssue);
+    public ResponseEntity<?> assignUsersToIssue(
+            @PathVariable UUID id,
+            @RequestBody(required = false) UUID userId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+            IssueDTO updatedIssue = issueService.assignUserToIssue(id, userId, token);
+            return ResponseEntity.ok(updatedIssue);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<IssueDTO>> searchIssues(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) UUID projectId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) UUID assignedId,
+            @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String direction) {
+
+        IssueEnum.Status statusEnum = null;
+        if (status != null && !status.isEmpty()) {
+            try {
+                statusEnum = IssueEnum.Status.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+            }
+        }
+
+        IssueEnum.Priority priorityEnum = null;
+        if (priority != null && !priority.isEmpty()) {
+            try {
+                priorityEnum = IssueEnum.Priority.valueOf(priority.toUpperCase());
+            } catch (IllegalArgumentException e) {
+            }
+        }
+
+        List<IssueDTO> results = issueService.findIssues(
+                keyword, projectId, statusEnum, priorityEnum, assignedId, sortBy, direction);
+
+        return ResponseEntity.ok(results);
     }
 }
