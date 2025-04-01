@@ -26,12 +26,14 @@ public class IssueService {
     private final IssueRepository issueRepository;
     private final IssueMapper issueMapper;
     private final UserValidationService userValidationService;
+    private final ProjectValidationService projectValidationService;
 
     @Autowired
-    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserValidationService userValidationService) {
+    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserValidationService userValidationService, ProjectValidationService projectValidationService) {
         this.issueRepository = issueRepository;
         this.issueMapper = issueMapper;
         this.userValidationService = userValidationService;
+        this.projectValidationService = projectValidationService;
     }
 
     @Transactional(readOnly = true)
@@ -49,6 +51,11 @@ public class IssueService {
         return issueMapper.issuesToIssueDTOs(issueRepository.findByStatus(status));
     }
 
+    @Transactional(readOnly = true)
+    public List<IssueDTO> getIssuesByProjectId(UUID projectId) {
+        return issueMapper.issuesToIssueDTOs(issueRepository.findByProjectId(projectId));
+    }
+
     @Transactional
     public IssueDTO createIssue(IssueDTO issueDTO, String token) {
         if (issueDTO == null) {
@@ -59,6 +66,10 @@ public class IssueService {
 
         if(userId == null){
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
+        }
+
+        if (!projectValidationService.validateProjectExists(issueDTO.getProjectId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
         }
 
         issueDTO.setReporterId(userId);

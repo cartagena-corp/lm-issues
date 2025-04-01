@@ -42,6 +42,12 @@ public class IssueController {
         return ResponseEntity.ok(issue);
     }
 
+    @GetMapping("/project/{projectId}")
+    public ResponseEntity<List<IssueDTO>> getIssuesByProjectId(@PathVariable UUID projectId) {
+        List<IssueDTO> issues = issueService.getIssuesByProjectId(projectId);
+        return ResponseEntity.ok(issues);
+    }
+
     @PostMapping
     public ResponseEntity<?> createIssue(
             @RequestBody IssueDTO issueDTO,
@@ -57,7 +63,7 @@ public class IssueController {
         } catch (ResponseStatusException ex) {
             return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
         } catch (Exception ex) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred");
         }
     }
 
