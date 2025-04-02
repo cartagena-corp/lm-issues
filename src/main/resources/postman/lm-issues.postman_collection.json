@@ -1,0 +1,410 @@
+{
+	"info": {
+		"_postman_id": "aba23a51-a525-4d89-83a1-0705d39c740f",
+		"name": "lm-issues",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "27060526"
+	},
+	"item": [
+		{
+			"name": "lm-issues",
+			"item": [
+				{
+					"name": "createIssue",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{googleToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"title\": \"CREAR CRUD ISSUES\",\r\n    \"descriptionsDTO\": [\r\n        {\r\n            \"text\": \"FILTRO POR STATUS\"\r\n        },\r\n        {\r\n            \"text\": \"REABRIR CASOS CERRADOS\"\r\n        }\r\n    ],\r\n    \"estimatedTime\": 7,\r\n    \"projectId\": \"id del proyecto\",\r\n    \"priority\": \"LOW\" //\"LOW\", \"MEDIUM\", \"HIGH\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/issues",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "listIssues",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "selectIssuesById",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues/{idIssue}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"{idIssue}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "listIssuesByStatus",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues/status/?status=OPEN",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"status",
+								""
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "OPEN"
+								},
+								{
+									"key": "status",
+									"value": "IN_PROGRESS",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "RESOLVED",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "CLOSED",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "REOPEN",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "updateIssue",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{googleToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"title\": \"CREAR CRUD ISSUES edit\",\r\n    \"descriptionsDTO\": [\r\n        {\r\n            \"id\": \"id de la descripcion ya existente\", //con id las que permanecen\r\n            \"text\": \"FILTRO POR STATUS\"\r\n        },\r\n        {\r\n            \"text\": \"REABRIR CASOS CERRADOS NUEVO\" //sin id las nuevas\r\n        }\r\n    ],\r\n    \"estimatedTime\": 6,\r\n    \"priority\": \"MEDIUM\", //\"LOW\", \"MEDIUM\", \"HIGH\" o null\r\n    \"status\": \"CLOSED\" // \"OPEN\", \"IN_PROGRESS\", \"RESOLVED\", \"CLOSED\", \"REOPEN\"  \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/issues/{idIssue}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"{idIssue}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "deleteIssue",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{googleToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues/{idIssue}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"{idIssue}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "reopenIssue",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{googleToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues/reopen/{idIssue}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"reopen",
+								"{idIssue}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "filters",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues/search?keyword=sos&assignedId=53c175e8-6771-4156-af99-4f1a176ae078&sortBy=createdAt&direction=ascd",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"search"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "sos"
+								},
+								{
+									"key": "projectId",
+									"value": "6c7f8e50-5403-46c5-b087-65113c366e8c",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "open",
+									"description": "OPEN, IN_PROGRESS, RESOLVED, CLOSED, REOPEN",
+									"disabled": true
+								},
+								{
+									"key": "priority",
+									"value": "low",
+									"description": "LOW, MEDIUM, HIGH",
+									"disabled": true
+								},
+								{
+									"key": "assignedId",
+									"value": "53c175e8-6771-4156-af99-4f1a176ae078"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								},
+								{
+									"key": "direction",
+									"value": "ascd",
+									"description": "ascd, desc"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "setUserToIssue",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{googleToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "\"53c175e8-6771-4156-af99-4f1a176ae078\" // id del usuario para asignarlo o null para quitar el asignado\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/issues/assignUser/{idIssue}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"assignUser",
+								"{idIssue}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "listIssuesByProjectId",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/issues/project/{idProyecto}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"issues",
+								"project",
+								"{idProyecto}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
