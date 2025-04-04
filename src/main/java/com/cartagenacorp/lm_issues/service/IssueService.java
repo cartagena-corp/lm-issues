@@ -16,9 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,13 +25,16 @@ public class IssueService {
     private final IssueMapper issueMapper;
     private final UserValidationService userValidationService;
     private final ProjectValidationService projectValidationService;
+    private final AuditService auditService;
 
     @Autowired
-    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserValidationService userValidationService, ProjectValidationService projectValidationService) {
+    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserValidationService userValidationService,
+                        ProjectValidationService projectValidationService, AuditService auditService) {
         this.issueRepository = issueRepository;
         this.issueMapper = issueMapper;
         this.userValidationService = userValidationService;
         this.projectValidationService = projectValidationService;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -100,10 +101,23 @@ public class IssueService {
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
-        issue.setTitle(updatedIssueDTO.getTitle());
-        issue.setEstimatedTime(updatedIssueDTO.getEstimatedTime());
-        issue.setPriority(updatedIssueDTO.getPriority());
-        issue.setStatus(updatedIssueDTO.getStatus());
+        List<String> changedFields = new ArrayList<>();
+        if (!Objects.equals(issue.getTitle(), updatedIssueDTO.getTitle())) {
+            changedFields.add("title");
+            issue.setTitle(updatedIssueDTO.getTitle());
+        }
+        if (!Objects.equals(issue.getEstimatedTime(), updatedIssueDTO.getEstimatedTime())) {
+            changedFields.add("estimatedTime");
+            issue.setEstimatedTime(updatedIssueDTO.getEstimatedTime());
+        }
+        if (!Objects.equals(issue.getPriority(), updatedIssueDTO.getPriority())) {
+            changedFields.add("priority");
+            issue.setPriority(updatedIssueDTO.getPriority());
+        }
+        if (!Objects.equals(issue.getStatus(), updatedIssueDTO.getStatus())) {
+            changedFields.add("status");
+            issue.setStatus(updatedIssueDTO.getStatus());
+        }
 
         if (updatedIssueDTO.getSprintId() != null) {
             issue.setSprintId(updatedIssueDTO.getSprintId());
@@ -133,6 +147,14 @@ public class IssueService {
             );
         }
         Issue savedIssue = issueRepository.save(issue);
+
+        if (!changedFields.isEmpty()) {
+            String auditDesc = "Updated fields: " + String.join(", ", changedFields);
+            try {
+                auditService.logChange(id, userId, "UPDATE", auditDesc);
+            } catch (Exception ignored) {}
+        }
+
         return issueMapper.issueToIssueDTO(savedIssue);
     }
 
@@ -160,6 +182,9 @@ public class IssueService {
                     if ("RESOLVED".equalsIgnoreCase(issue.getStatus().toString()) || "CLOSED".equalsIgnoreCase(issue.getStatus().toString())) {
                         issue.setStatus(Status.REOPEN);
                         Issue savedIssue = issueRepository.save(issue);
+                        try {
+                            auditService.logChange(id, userId, "UPDATE", "Issue reopened");
+                        }catch (Exception ignored){}
                         return issueMapper.issueToIssueDTO(savedIssue);
                     }
                     throw new IllegalStateException("Issue is not in a closed state and cannot be reopened.");
@@ -178,16 +203,24 @@ public class IssueService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
+        String auditDescription = "";
         if (assignedId == null) {
             issue.setAssignedId(null);
+            auditDescription = "User unassigned to issue";
         } else {
             if (!userValidationService.userExists(assignedId, token)) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
             }
             issue.setAssignedId(userId);
+            auditDescription = "User assigned to issue";
         }
 
         Issue savedIssue = issueRepository.save(issue);
+
+        try {
+            auditService.logChange(issueId, userId, "UPDATE", auditDescription);
+        }catch (Exception ignored){}
+
         return issueMapper.issueToIssueDTO(savedIssue);
     }
 
