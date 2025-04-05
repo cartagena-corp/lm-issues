@@ -3,6 +3,7 @@ package com.cartagenacorp.lm_issues.controller;
 import com.cartagenacorp.lm_issues.dto.IssueDTO;
 import com.cartagenacorp.lm_issues.enums.IssueEnum;
 import com.cartagenacorp.lm_issues.service.IssueService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -183,5 +184,19 @@ public class IssueController {
                 keyword, projectId, statusEnum, priorityEnum, assignedId, sortBy, direction);
 
         return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/validate/{id}")
+    public ResponseEntity<Boolean> issueExists(@PathVariable String id){
+        try {
+            UUID uuid = UUID.fromString(id);
+            return ResponseEntity.status(HttpStatus.OK).body(issueService.issueExists(uuid));
+        }  catch (EntityNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (IllegalArgumentException ex){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        } catch (Exception ex){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

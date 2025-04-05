@@ -282,4 +282,9 @@ public class IssueService {
                 .sorted(comparator)
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public boolean issueExists(UUID id){
+        return issueRepository.existsById(id);
+    }
 }

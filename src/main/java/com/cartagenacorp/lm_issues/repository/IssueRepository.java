@@ -14,4 +14,6 @@ public interface IssueRepository extends JpaRepository<Issue, UUID>, JpaSpecific
     List<Issue> findByStatus(Status status);
 
     List<Issue> findByProjectId(UUID projectId);
+
+    boolean existsById(UUID id);
 }
