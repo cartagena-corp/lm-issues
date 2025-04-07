@@ -25,12 +25,13 @@ public class AuditService {
         this.restTemplate = restTemplate;
     }
 
-    public void logChange(UUID issueId, UUID userId, String action, String description) {
+    public void logChange(UUID issueId, UUID userId, String action, String description, UUID projectId) {
         Map<String, Object> auditLog = new HashMap<>();
         auditLog.put("issueId", issueId);
         auditLog.put("userId", userId);
         auditLog.put("action", action);
         auditLog.put("description", description);
+        auditLog.put("projectId", projectId);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

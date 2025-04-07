@@ -151,7 +151,7 @@ public class IssueService {
         if (!changedFields.isEmpty()) {
             String auditDesc = "Updated fields: " + String.join(", ", changedFields);
             try {
-                auditService.logChange(id, userId, "UPDATE", auditDesc);
+                auditService.logChange(id, userId, "UPDATE", auditDesc, savedIssue.getProjectId());
             } catch (Exception ignored) {}
         }
 
@@ -183,7 +183,7 @@ public class IssueService {
                         issue.setStatus(Status.REOPEN);
                         Issue savedIssue = issueRepository.save(issue);
                         try {
-                            auditService.logChange(id, userId, "UPDATE", "Issue reopened");
+                            auditService.logChange(id, userId, "UPDATE", "Issue reopened", savedIssue.getProjectId());
                         }catch (Exception ignored){}
                         return issueMapper.issueToIssueDTO(savedIssue);
                     }
@@ -218,7 +218,7 @@ public class IssueService {
         Issue savedIssue = issueRepository.save(issue);
 
         try {
-            auditService.logChange(issueId, userId, "UPDATE", auditDescription);
+            auditService.logChange(issueId, userId, "UPDATE", auditDescription, savedIssue.getProjectId());
         }catch (Exception ignored){}
 
         return issueMapper.issueToIssueDTO(savedIssue);
