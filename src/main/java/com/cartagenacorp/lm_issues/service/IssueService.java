@@ -9,6 +9,7 @@ import com.cartagenacorp.lm_issues.enums.IssueEnum;
 import com.cartagenacorp.lm_issues.enums.IssueEnum.Status;
 import com.cartagenacorp.lm_issues.mapper.IssueMapper;
 import com.cartagenacorp.lm_issues.repository.IssueRepository;
+import com.cartagenacorp.lm_issues.util.JwtContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -58,16 +59,12 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueDTO createIssue(IssueDTO issueDTO, String token) {
+    public IssueDTO createIssue(IssueDTO issueDTO) {
         if (issueDTO == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
         }
 
-        UUID userId = userValidationService.getUserIdFromToken(token);
-
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
+        UUID userId = JwtContextHolder.getUserId();
 
         if (!projectValidationService.validateProjectExists(issueDTO.getProjectId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
@@ -87,16 +84,12 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueDTO updateIssue(UUID id, IssueDTO updatedIssueDTO, String token) {
+    public IssueDTO updateIssue(UUID id, IssueDTO updatedIssueDTO) {
         if (updatedIssueDTO == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
         }
 
-        UUID userId = userValidationService.getUserIdFromToken(token);
-
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
+        UUID userId = JwtContextHolder.getUserId();
 
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
@@ -159,24 +152,16 @@ public class IssueService {
     }
 
     @Transactional
-    public void deleteIssue(UUID id, String token) {
-        UUID userId = userValidationService.getUserIdFromToken(token);
-
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
+    public void deleteIssue(UUID id) {
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
         issueRepository.delete(issue);
     }
 
     @Transactional
-    public IssueDTO reopenIssue(UUID id, String token) {
-        UUID userId = userValidationService.getUserIdFromToken(token);
+    public IssueDTO reopenIssue(UUID id) {
+        UUID userId = JwtContextHolder.getUserId();
 
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
         return issueRepository.findById(id)
                 .map(issue -> {
                     if ("RESOLVED".equalsIgnoreCase(issue.getStatus().toString()) || "CLOSED".equalsIgnoreCase(issue.getStatus().toString())) {
@@ -193,12 +178,9 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueDTO assignUserToIssue(UUID issueId, UUID assignedId, String token) {
-        UUID userId = userValidationService.getUserIdFromToken(token);
-
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
+    public IssueDTO assignUserToIssue(UUID issueId, UUID assignedId) {
+        UUID userId = JwtContextHolder.getUserId();
+        String token = JwtContextHolder.getToken();
 
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
@@ -211,7 +193,7 @@ public class IssueService {
             if (!userValidationService.userExists(assignedId, token)) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
             }
-            issue.setAssignedId(userId);
+            issue.setAssignedId(assignedId);
             auditDescription = "User assigned to issue";
         }
 
