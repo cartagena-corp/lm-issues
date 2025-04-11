@@ -2,6 +2,7 @@ package com.cartagenacorp.lm_issues.service;
 
 import com.cartagenacorp.lm_issues.dto.DescriptionDTO;
 import com.cartagenacorp.lm_issues.dto.IssueDTO;
+import com.cartagenacorp.lm_issues.dto.PageResponseDTO;
 import com.cartagenacorp.lm_issues.repository.specifications.IssueSpecifications;
 import com.cartagenacorp.lm_issues.entity.Description;
 import com.cartagenacorp.lm_issues.entity.Issue;
@@ -11,6 +12,8 @@ import com.cartagenacorp.lm_issues.mapper.IssueMapper;
 import com.cartagenacorp.lm_issues.repository.IssueRepository;
 import com.cartagenacorp.lm_issues.util.JwtContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,8 +42,10 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public List<IssueDTO> getAllIssues() {
-        return issueMapper.issuesToIssueDTOs(issueRepository.findAll());
+    public PageResponseDTO<IssueDTO> getAllIssues(Pageable pageable) {
+        Page<Issue> issues = issueRepository.findAll(pageable);
+        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
+        return new PageResponseDTO<>(issueDTOs);
     }
 
     @Transactional(readOnly = true)
@@ -49,13 +54,17 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public List<IssueDTO> getIssuesByStatus(Status status) {
-        return issueMapper.issuesToIssueDTOs(issueRepository.findByStatus(status));
+    public PageResponseDTO<IssueDTO> getIssuesByStatus(Status status, Pageable pageable) {
+        Page<Issue> issues = issueRepository.findByStatus(status, pageable);
+        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
+        return new PageResponseDTO<>(issueDTOs);
     }
 
     @Transactional(readOnly = true)
-    public List<IssueDTO> getIssuesByProjectId(UUID projectId) {
-        return issueMapper.issuesToIssueDTOs(issueRepository.findByProjectId(projectId));
+    public PageResponseDTO<IssueDTO> getIssuesByProjectId(UUID projectId, Pageable pageable) {
+        Page<Issue> issues = issueRepository.findByProjectId(projectId, pageable);
+        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
+        return new PageResponseDTO<>(issueDTOs);
     }
 
     @Transactional
@@ -207,9 +216,9 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public List<IssueDTO> findIssues(String keyword, UUID projectId, Status status,
+    public PageResponseDTO<IssueDTO> findIssues(String keyword, UUID projectId, Status status,
                                      IssueEnum.Priority priority, UUID assignedId,
-                                     String sortBy, String direction) {
+                                     Pageable pageable) {
 
         Specification<Issue> spec = Specification
                 .where(IssueSpecifications.searchByKeyword(keyword))
@@ -218,51 +227,10 @@ public class IssueService {
                 .and(IssueSpecifications.hasPriority(priority))
                 .and(IssueSpecifications.hasAssigned(assignedId));
 
-        List<Issue> issues = issueRepository.findAll(spec);
-        List<IssueDTO> issueDTOs = issueMapper.issuesToIssueDTOs(issues);
+        Page<Issue> issues = issueRepository.findAll(spec, pageable);
+        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
 
-        if (sortBy != null && !sortBy.isEmpty()) {
-            issueDTOs = sortIssues(issueDTOs, sortBy, direction);
-        }
-
-        return issueDTOs;
-    }
-
-    private List<IssueDTO> sortIssues(List<IssueDTO> issues, String sortBy, String direction) {
-        Comparator<IssueDTO> comparator;
-
-        switch (sortBy.toLowerCase()) {
-            case "createdat":
-                comparator = Comparator.comparing(IssueDTO::getCreatedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-                break;
-            case "updatedat":
-                comparator = Comparator.comparing(IssueDTO::getUpdatedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-                break;
-            case "priority":
-                comparator = Comparator.comparing(issue -> issue.getPriority().ordinal());
-                break;
-            case "title":
-                comparator = Comparator.comparing(IssueDTO::getTitle,
-                        String.CASE_INSENSITIVE_ORDER);
-                break;
-            case "estimatedtime":
-                comparator = Comparator.comparing(IssueDTO::getEstimatedTime,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-                break;
-            default:
-                comparator = Comparator.comparing(IssueDTO::getCreatedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-        }
-
-        if ("desc".equalsIgnoreCase(direction)) {
-            comparator = comparator.reversed();
-        }
-
-        return issues.stream()
-                .sorted(comparator)
-                .collect(Collectors.toList());
+        return new PageResponseDTO<>(issueDTOs);
     }
 
     @Transactional(readOnly = true)
