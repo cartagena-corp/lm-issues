@@ -24,7 +24,7 @@ public class Issue {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @Column(name = "title", nullable = false, length = 150)
+    @Column(name = "title", nullable = false, length = 500)
     private String title;
 
     @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true)

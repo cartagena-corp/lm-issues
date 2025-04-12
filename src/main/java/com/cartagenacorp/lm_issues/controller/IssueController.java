@@ -7,6 +7,7 @@ import com.cartagenacorp.lm_issues.service.IssueService;
 import com.cartagenacorp.lm_issues.util.RequiresPermission;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -226,6 +228,22 @@ public class IssueController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (Exception ex){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/batch")
+    @RequiresPermission({"ISSUE_CRUD"})
+    public ResponseEntity<?> createIssuesBatch(@RequestBody List<IssueDTO> issues) {
+        try {
+            List<IssueDTO> result = issueService.createIssuesBatch(issues);
+            return new ResponseEntity<>(result, HttpStatus.CREATED);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Data Error: One or more fields exceed the allowed limit");
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + ex.getMessage());
         }
     }
 }

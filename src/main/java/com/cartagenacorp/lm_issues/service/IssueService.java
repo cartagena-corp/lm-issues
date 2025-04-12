@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class IssueService {
@@ -236,5 +235,25 @@ public class IssueService {
     @Transactional(readOnly = true)
     public boolean issueExists(UUID id){
         return issueRepository.existsById(id);
+    }
+
+    @Transactional
+    public List<IssueDTO> createIssuesBatch(List<IssueDTO> issues) {
+        UUID userId = JwtContextHolder.getUserId();
+        List<Issue> entities = new ArrayList<>();
+
+        for (IssueDTO issueDTO : issues) {
+            issueDTO.setReporterId(userId);
+            if (issueDTO.getStatus() == null) {
+                issueDTO.setStatus(Status.OPEN);
+            }
+
+            Issue issue = issueMapper.issueDTOToIssue(issueDTO);
+            issue.getDescriptions().forEach(description -> description.setIssue(issue));
+            entities.add(issue);
+        }
+
+        List<Issue> saved = issueRepository.saveAll(entities);
+        return saved.stream().map(issueMapper::issueToIssueDTO).toList();
     }
 }

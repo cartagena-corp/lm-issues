@@ -18,7 +18,7 @@ public class Description {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @Column(name = "text", nullable = false, length = 250)
+    @Column(name = "text", nullable = false, length = 1500)
     private String text;
 
     @ManyToOne()
