@@ -1,6 +1,5 @@
 package com.cartagenacorp.lm_issues.entity;
 
-import com.cartagenacorp.lm_issues.enums.IssueEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -40,12 +39,10 @@ public class Issue {
     private UUID sprintId;
 
     @Column(name = "priority", length = 20)
-    @Enumerated(EnumType.STRING)
-    private IssueEnum.Priority priority;
+    private String priority;
 
     @Column(name = "status", nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
-    private IssueEnum.Status status;
+    private String status;
 
     @Column(name = "createdAt", nullable = false)
     @CreationTimestamp

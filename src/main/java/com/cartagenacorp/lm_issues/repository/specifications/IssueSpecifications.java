@@ -2,7 +2,6 @@ package com.cartagenacorp.lm_issues.repository.specifications;
 
 import com.cartagenacorp.lm_issues.entity.Description;
 import com.cartagenacorp.lm_issues.entity.Issue;
-import com.cartagenacorp.lm_issues.enums.IssueEnum;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
@@ -36,7 +35,7 @@ public class IssueSpecifications {
         };
     }
 
-    public static Specification<Issue> hasStatus(IssueEnum.Status status) {
+    public static Specification<Issue> hasStatus(String status) {
         return (root, query, criteriaBuilder) -> {
             if (status == null) {
                 return criteriaBuilder.conjunction();
@@ -45,7 +44,7 @@ public class IssueSpecifications {
         };
     }
 
-    public static Specification<Issue> hasPriority(IssueEnum.Priority priority) {
+    public static Specification<Issue> hasPriority(String priority) {
         return (root, query, criteriaBuilder) -> {
             if (priority == null) {
                 return criteriaBuilder.conjunction();

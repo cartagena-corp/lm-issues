@@ -1,6 +1,5 @@
 package com.cartagenacorp.lm_issues.dto;
 
-import com.cartagenacorp.lm_issues.enums.IssueEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,8 +19,8 @@ public class IssueDTO {
     private Integer estimatedTime;
     private UUID projectId;
     private UUID sprintId;
-    private IssueEnum.Priority priority;
-    private IssueEnum.Status status;
+    private String priority;
+    private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private UUID reporterId;

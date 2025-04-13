@@ -2,7 +2,6 @@ package com.cartagenacorp.lm_issues.controller;
 
 import com.cartagenacorp.lm_issues.dto.IssueDTO;
 import com.cartagenacorp.lm_issues.dto.PageResponseDTO;
-import com.cartagenacorp.lm_issues.enums.IssueEnum;
 import com.cartagenacorp.lm_issues.service.IssueService;
 import com.cartagenacorp.lm_issues.util.RequiresPermission;
 import jakarta.persistence.EntityNotFoundException;
@@ -57,8 +56,7 @@ public class IssueController {
         Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        IssueEnum.Status statusEnum = IssueEnum.Status.valueOf(status.toUpperCase());
-        PageResponseDTO<IssueDTO> issues = issueService.getIssuesByStatus(statusEnum, pageable);
+        PageResponseDTO<IssueDTO> issues = issueService.getIssuesByStatus(status, pageable);
         return ResponseEntity.ok(issues);
     }
 
@@ -111,6 +109,8 @@ public class IssueController {
             return new ResponseEntity<>(createdIssue, HttpStatus.CREATED);
         } catch (ResponseStatusException ex) {
             return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Data Error: invalid data");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred" + ex.getMessage());
         }
@@ -127,6 +127,8 @@ public class IssueController {
             return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
         } catch (IllegalArgumentException ex){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Data Error: invalid data");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
         }
@@ -159,6 +161,8 @@ public class IssueController {
             return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
         } catch (IllegalArgumentException ex){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Data Error: invalid data");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
         }
@@ -175,6 +179,8 @@ public class IssueController {
             return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
         } catch (IllegalArgumentException ex){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Data Error: invalid data");
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
         }
@@ -193,26 +199,11 @@ public class IssueController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        IssueEnum.Status statusEnum = null;
-        if (status != null && !status.isEmpty()) {
-            try {
-                statusEnum = IssueEnum.Status.valueOf(status.toUpperCase());
-            } catch (IllegalArgumentException e) {
-            }
-        }
-
-        IssueEnum.Priority priorityEnum = null;
-        if (priority != null && !priority.isEmpty()) {
-            try {
-                priorityEnum = IssueEnum.Priority.valueOf(priority.toUpperCase());
-            } catch (IllegalArgumentException e) {
-            }
-        }
         Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
 
         PageResponseDTO<IssueDTO> results = issueService.findIssues(
-                keyword, projectId, statusEnum, priorityEnum, assignedId, pageable);
+                keyword, projectId, status, priority, assignedId, pageable);
 
         return ResponseEntity.ok(results);
     }

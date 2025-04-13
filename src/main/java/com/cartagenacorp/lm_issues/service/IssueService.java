@@ -6,8 +6,6 @@ import com.cartagenacorp.lm_issues.dto.PageResponseDTO;
 import com.cartagenacorp.lm_issues.repository.specifications.IssueSpecifications;
 import com.cartagenacorp.lm_issues.entity.Description;
 import com.cartagenacorp.lm_issues.entity.Issue;
-import com.cartagenacorp.lm_issues.enums.IssueEnum;
-import com.cartagenacorp.lm_issues.enums.IssueEnum.Status;
 import com.cartagenacorp.lm_issues.mapper.IssueMapper;
 import com.cartagenacorp.lm_issues.repository.IssueRepository;
 import com.cartagenacorp.lm_issues.util.JwtContextHolder;
@@ -20,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class IssueService {
@@ -29,15 +29,17 @@ public class IssueService {
     private final UserValidationService userValidationService;
     private final ProjectValidationService projectValidationService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Autowired
     public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserValidationService userValidationService,
-                        ProjectValidationService projectValidationService, AuditService auditService) {
+                        ProjectValidationService projectValidationService, AuditService auditService, NotificationService notificationService) {
         this.issueRepository = issueRepository;
         this.issueMapper = issueMapper;
         this.userValidationService = userValidationService;
         this.projectValidationService = projectValidationService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +55,7 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> getIssuesByStatus(Status status, Pageable pageable) {
+    public PageResponseDTO<IssueDTO> getIssuesByStatus(String status, Pageable pageable) {
         Page<Issue> issues = issueRepository.findByStatus(status, pageable);
         Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
         return new PageResponseDTO<>(issueDTOs);
@@ -73,14 +75,20 @@ public class IssueService {
         }
 
         UUID userId = JwtContextHolder.getUserId();
+        String token = JwtContextHolder.getToken();
 
         if (!projectValidationService.validateProjectExists(issueDTO.getProjectId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
         }
 
+        if (issueDTO.getAssignedId() != null &&
+                !userValidationService.userExists(issueDTO.getAssignedId(), token)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+
         issueDTO.setReporterId(userId);
         if(issueDTO.getStatus() == null){
-            issueDTO.setStatus(Status.OPEN);
+            issueDTO.setStatus("OPEN");
         }
 
         Issue issue = issueMapper.issueDTOToIssue(issueDTO);
@@ -88,6 +96,21 @@ public class IssueService {
         issue.getDescriptions().forEach(description -> description.setIssue(issue));
         Issue savedIssue = issueRepository.save(issue);
         issueRepository.flush();
+
+        if (savedIssue.getAssignedId() != null) {
+            try {
+                notificationService.sendNotification(
+                        savedIssue.getAssignedId(),
+                        "A new issue has been created to which you are assigned: " + savedIssue.getTitle(),
+                        "ISSUE_ASSIGNED",
+                        Map.of(
+                                "issueId", savedIssue.getId().toString(),
+                                "projectId", savedIssue.getProjectId().toString()
+                        )
+                );
+            } catch (Exception ignored) {}
+        }
+
         return issueMapper.issueToIssueDTO(savedIssue);
     }
 
@@ -103,6 +126,15 @@ public class IssueService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
         List<String> changedFields = new ArrayList<>();
+        AtomicBoolean descriptionsChanged = new AtomicBoolean(false);
+
+        if (updatedIssueDTO.getTitle() == null || updatedIssueDTO.getTitle().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title cannot be null or blank");
+        }
+        if (updatedIssueDTO.getStatus() == null || updatedIssueDTO.getStatus().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status cannot be null or blank");
+        }
+
         if (!Objects.equals(issue.getTitle(), updatedIssueDTO.getTitle())) {
             changedFields.add("title");
             issue.setTitle(updatedIssueDTO.getTitle());
@@ -132,21 +164,36 @@ public class IssueService {
                     issue.getDescriptions().stream()
                             .filter(description -> description.getId().equals(descriptionDTO.getId()))
                             .findFirst()
-                            .ifPresent(description -> description.setText(descriptionDTO.getText()));
+                            .ifPresent(description -> {
+                                if (!Objects.equals(description.getText(), descriptionDTO.getText())) {
+                                    description.setText(descriptionDTO.getText());
+                                    descriptionsChanged.set(true);
+                                }
+                            });
                 } else {
                     Description newDescription = new Description();
                     newDescription.setText(descriptionDTO.getText());
                     newDescription.setIssue(issue);
                     issue.getDescriptions().add(newDescription);
+                    descriptionsChanged.set(true);
                 }
             }
-            issue.getDescriptions().removeIf(
+            boolean removed = issue.getDescriptions().removeIf(
                     description -> description.getId() != null && updatedIssueDTO.getDescriptionsDTO().stream()
                             .noneMatch(descriptionDTO ->
                                     descriptionDTO.getId() != null && descriptionDTO.getId().equals(description.getId())
                             )
             );
+            if (removed) {
+                descriptionsChanged.set(true);
+            }
+
+            if (descriptionsChanged.get()) {
+                changedFields.add("descriptions");
+                issue.setUpdatedAt(LocalDateTime.now());
+            }
         }
+
         Issue savedIssue = issueRepository.save(issue);
 
         if (!changedFields.isEmpty()) {
@@ -154,6 +201,20 @@ public class IssueService {
             try {
                 auditService.logChange(id, userId, "UPDATE", auditDesc, savedIssue.getProjectId());
             } catch (Exception ignored) {}
+
+            if (savedIssue.getAssignedId() != null) {
+                try {
+                    notificationService.sendNotification(
+                            savedIssue.getAssignedId(),
+                            "An issue you are assigned to has been updated: " + savedIssue.getTitle(),
+                            "ISSUE_UPDATED",
+                            Map.of(
+                                    "issueId", savedIssue.getId().toString(),
+                                    "projectId", savedIssue.getProjectId().toString()
+                            )
+                    );
+                } catch (Exception ignored) {}
+            }
         }
 
         return issueMapper.issueToIssueDTO(savedIssue);
@@ -173,7 +234,7 @@ public class IssueService {
         return issueRepository.findById(id)
                 .map(issue -> {
                     if ("RESOLVED".equalsIgnoreCase(issue.getStatus().toString()) || "CLOSED".equalsIgnoreCase(issue.getStatus().toString())) {
-                        issue.setStatus(Status.REOPEN);
+                        issue.setStatus("REOPEN");
                         Issue savedIssue = issueRepository.save(issue);
                         try {
                             auditService.logChange(id, userId, "UPDATE", "Issue reopened", savedIssue.getProjectId());
@@ -209,14 +270,28 @@ public class IssueService {
 
         try {
             auditService.logChange(issueId, userId, "UPDATE", auditDescription, savedIssue.getProjectId());
-        }catch (Exception ignored){}
+        } catch (Exception ignored){}
+
+        if (savedIssue.getAssignedId() != null) {
+            try {
+                notificationService.sendNotification(
+                        savedIssue.getAssignedId(),
+                        "You have been assigned to an issue: " + savedIssue.getTitle(),
+                        "ISSUE_ASSIGNED",
+                        Map.of(
+                                "issueId", savedIssue.getId().toString(),
+                                "projectId", savedIssue.getProjectId().toString()
+                        )
+                );
+            } catch (Exception ignored) {}
+        }
 
         return issueMapper.issueToIssueDTO(savedIssue);
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> findIssues(String keyword, UUID projectId, Status status,
-                                     IssueEnum.Priority priority, UUID assignedId,
+    public PageResponseDTO<IssueDTO> findIssues(String keyword, UUID projectId, String status,
+                                                String priority, UUID assignedId,
                                      Pageable pageable) {
 
         Specification<Issue> spec = Specification
@@ -245,7 +320,7 @@ public class IssueService {
         for (IssueDTO issueDTO : issues) {
             issueDTO.setReporterId(userId);
             if (issueDTO.getStatus() == null) {
-                issueDTO.setStatus(Status.OPEN);
+                issueDTO.setStatus("OPEN");
             }
 
             Issue issue = issueMapper.issueDTOToIssue(issueDTO);
