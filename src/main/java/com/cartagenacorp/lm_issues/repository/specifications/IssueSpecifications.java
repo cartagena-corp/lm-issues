@@ -35,6 +35,15 @@ public class IssueSpecifications {
         };
     }
 
+    public static Specification<Issue> hasSprint(UUID sprintId) {
+        return (root, query, criteriaBuilder) -> {
+            if (sprintId == null) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.equal(root.get("sprintId"), sprintId);
+        };
+    }
+
     public static Specification<Issue> hasStatus(String status) {
         return (root, query, criteriaBuilder) -> {
             if (status == null) {

@@ -152,12 +152,6 @@ public class IssueService {
             issue.setStatus(updatedIssueDTO.getStatus());
         }
 
-        if (updatedIssueDTO.getSprintId() != null) {
-            issue.setSprintId(updatedIssueDTO.getSprintId());
-        } else {
-            issue.setSprintId(null);
-        }
-
         if (updatedIssueDTO.getDescriptionsDTO() != null) {
             for (DescriptionDTO descriptionDTO : updatedIssueDTO.getDescriptionsDTO()) {
                 if (descriptionDTO.getId() != null) {
@@ -290,13 +284,14 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> findIssues(String keyword, UUID projectId, String status,
+    public PageResponseDTO<IssueDTO> findIssues(String keyword, UUID projectId, UUID sprintId, String status,
                                                 String priority, UUID assignedId,
                                      Pageable pageable) {
 
         Specification<Issue> spec = Specification
                 .where(IssueSpecifications.searchByKeyword(keyword))
                 .and(IssueSpecifications.hasProject(projectId))
+                .and(IssueSpecifications.hasSprint(sprintId))
                 .and(IssueSpecifications.hasStatus(status))
                 .and(IssueSpecifications.hasPriority(priority))
                 .and(IssueSpecifications.hasAssigned(assignedId));
@@ -330,5 +325,33 @@ public class IssueService {
 
         List<Issue> saved = issueRepository.saveAll(entities);
         return saved.stream().map(issueMapper::issueToIssueDTO).toList();
+    }
+
+    @Transactional
+    public void assignIssuesToSprint(List<UUID> issueIds, UUID sprintId) {
+        List<Issue> issues = issueRepository.findAllById(issueIds);
+
+        if (issues.size() != issueIds.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Some issues were not found");
+        }
+
+        for (Issue issue : issues) {
+            issue.setSprintId(sprintId);
+        }
+        issueRepository.saveAll(issues);
+    }
+
+    @Transactional
+    public void removeIssuesFromSprint(List<UUID> issueIds) {
+        List<Issue> issues = issueRepository.findAllById(issueIds);
+
+        if (issues.size() != issueIds.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Some issues were not found");
+        }
+
+        for (Issue issue : issues) {
+            issue.setSprintId(null);
+        }
+        issueRepository.saveAll(issues);
     }
 }

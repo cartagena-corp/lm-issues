@@ -1,7 +1,9 @@
 package com.cartagenacorp.lm_issues.controller;
 
+import com.cartagenacorp.lm_issues.dto.AssignRequest;
 import com.cartagenacorp.lm_issues.dto.IssueDTO;
 import com.cartagenacorp.lm_issues.dto.PageResponseDTO;
+import com.cartagenacorp.lm_issues.dto.RemoveRequest;
 import com.cartagenacorp.lm_issues.service.IssueService;
 import com.cartagenacorp.lm_issues.util.RequiresPermission;
 import jakarta.persistence.EntityNotFoundException;
@@ -191,6 +193,7 @@ public class IssueController {
     public ResponseEntity<PageResponseDTO<IssueDTO>> searchIssues(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) UUID projectId,
+            @RequestParam(required = false) UUID sprintId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) UUID assignedId,
@@ -203,7 +206,7 @@ public class IssueController {
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
 
         PageResponseDTO<IssueDTO> results = issueService.findIssues(
-                keyword, projectId, status, priority, assignedId, pageable);
+                keyword, projectId, sprintId, status, priority, assignedId, pageable);
 
         return ResponseEntity.ok(results);
     }
@@ -236,5 +239,19 @@ public class IssueController {
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + ex.getMessage());
         }
+    }
+
+    @PostMapping("/assign")
+    @RequiresPermission({"SPRINT_CRUD"})
+    public ResponseEntity<Void> assignIssuesToSprint(@RequestBody AssignRequest request) {
+        issueService.assignIssuesToSprint(request.getIssueIds(), request.getSprintId());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/remove")
+    @RequiresPermission({"SPRINT_CRUD"})
+    public ResponseEntity<Void> removeIssuesFromSprint(@RequestBody RemoveRequest request) {
+        issueService.removeIssuesFromSprint(request.getIssueIds());
+        return ResponseEntity.ok().build();
     }
 }
