@@ -29,7 +29,7 @@ public class Issue {
     @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Description> descriptions = new ArrayList<>();
 
-    @Column(name = "estimatedTime", nullable = false)
+    @Column(name = "estimatedTime")
     private Integer estimatedTime;
 
     @Column(name = "project_id")
@@ -38,11 +38,14 @@ public class Issue {
     @Column(name = "sprint_id")
     private UUID sprintId;
 
-    @Column(name = "priority", length = 20)
-    private String priority;
+    @Column(name = "priority")
+    private Long priority;
 
-    @Column(name = "status", nullable = false, length = 20)
-    private String status;
+    @Column(name = "status")
+    private Long status;
+
+    @Column(name = "type")
+    private Long type;
 
     @Column(name = "createdAt", nullable = false)
     @CreationTimestamp

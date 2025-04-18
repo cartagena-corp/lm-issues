@@ -14,6 +14,7 @@ public class IssueSpecifications {
             if (keyword == null || keyword.trim().isEmpty()) {
                 return criteriaBuilder.conjunction();
             }
+            query.distinct(true);
 
             String searchTerm = "%" + keyword.toLowerCase() + "%";
 
@@ -44,7 +45,7 @@ public class IssueSpecifications {
         };
     }
 
-    public static Specification<Issue> hasStatus(String status) {
+    public static Specification<Issue> hasStatus(Long status) {
         return (root, query, criteriaBuilder) -> {
             if (status == null) {
                 return criteriaBuilder.conjunction();
@@ -53,12 +54,21 @@ public class IssueSpecifications {
         };
     }
 
-    public static Specification<Issue> hasPriority(String priority) {
+    public static Specification<Issue> hasPriority(Long priority) {
         return (root, query, criteriaBuilder) -> {
             if (priority == null) {
                 return criteriaBuilder.conjunction();
             }
             return criteriaBuilder.equal(root.get("priority"), priority);
+        };
+    }
+
+    public static Specification<Issue> hasType(Long type) {
+        return (root, query, criteriaBuilder) -> {
+            if (type == null) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.equal(root.get("type"), type);
         };
     }
 

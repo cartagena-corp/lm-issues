@@ -1,14 +1,15 @@
 package com.cartagenacorp.lm_issues.service;
 
+import com.cartagenacorp.lm_issues.dto.UserBasicDataDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -63,6 +64,45 @@ public class UserValidationService {
             return null;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    public Optional<UserBasicDataDto> getUserData(String token, String userId) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<UserBasicDataDto> response = restTemplate.exchange(
+                    authServiceUrl + "/user/" + userId,
+                    HttpMethod.GET,
+                    entity,
+                    UserBasicDataDto.class
+            );
+            return Optional.ofNullable(response.getBody());
+        } catch (Exception e) {
+            System.out.println("Error getting user: " + e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public Optional<List<UserBasicDataDto>> getUsersData(String token, List<String> ids) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<List<String>> entity = new HttpEntity<>(ids, headers);
+
+            ResponseEntity<List<UserBasicDataDto>> response = restTemplate.exchange(
+                    authServiceUrl + "/users/batch",
+                    HttpMethod.POST,
+                    entity,
+                    new ParameterizedTypeReference<>() {}
+            );
+            return Optional.ofNullable(response.getBody());
+        } catch (Exception e) {
+            System.out.println("Error getting users: " + e.getMessage());
+            return Optional.empty();
         }
     }
 }

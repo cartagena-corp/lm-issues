@@ -21,12 +21,9 @@ public class JwtTokenUtil {
         try {
             Jwts.parser().setSigningKey(secret).parseClaimsJws(token);
             return true;
-        } catch (ExpiredJwtException e) {
-            System.out.println("Token expired");
         } catch (JwtException e) {
-            System.out.println("Invalid token: " + e.getMessage());
+            return false;
         }
-        return false;
     }
 
     private Claims getAllClaimsFromToken(String token) {

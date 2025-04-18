@@ -19,8 +19,9 @@ public class IssueDTO {
     private Integer estimatedTime;
     private UUID projectId;
     private UUID sprintId;
-    private String priority;
-    private String status;
+    private Long priority;
+    private Long status;
+    private Long type;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private UUID reporterId;

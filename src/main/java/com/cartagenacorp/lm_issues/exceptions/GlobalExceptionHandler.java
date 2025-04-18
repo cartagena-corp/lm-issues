@@ -6,15 +6,27 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationErrors(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(err ->
+                errors.put(err.getField(), err.getDefaultMessage())
+        );
+        return ResponseEntity.badRequest().body(errors);
+    }
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<Exceptions> handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
@@ -27,23 +39,29 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Exceptions> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
+        String message = ex.getMessage() != null && ex.getMessage().toLowerCase().contains("uuid")
+                ? "The ID provided is not a valid UUID"
+                : "Invalid parameters in the request";
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
     }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Exceptions> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, "Data integrity error", request);
+        return buildResponse(HttpStatus.CONFLICT, "Integrity Data Error", request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Exceptions> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, "Data integrity error ", request);
+        return buildResponse(HttpStatus.CONFLICT, "Integrity Data Error ", request);
     }
 
     @ExceptionHandler(SQLException.class)
     public ResponseEntity<Exceptions> handleSQLException(SQLException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Exceptions> handleAllExceptions(Exception ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request);

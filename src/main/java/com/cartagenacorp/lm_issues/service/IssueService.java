@@ -1,8 +1,6 @@
 package com.cartagenacorp.lm_issues.service;
 
-import com.cartagenacorp.lm_issues.dto.DescriptionDTO;
-import com.cartagenacorp.lm_issues.dto.IssueDTO;
-import com.cartagenacorp.lm_issues.dto.PageResponseDTO;
+import com.cartagenacorp.lm_issues.dto.*;
 import com.cartagenacorp.lm_issues.repository.specifications.IssueSpecifications;
 import com.cartagenacorp.lm_issues.entity.Description;
 import com.cartagenacorp.lm_issues.entity.Issue;
@@ -21,6 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class IssueService {
@@ -43,79 +43,68 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> getAllIssues(Pageable pageable) {
+    public PageResponseDTO<IssueDtoResponse> getAllIssues(Pageable pageable) {
         Page<Issue> issues = issueRepository.findAll(pageable);
-        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
-        return new PageResponseDTO<>(issueDTOs);
+        return new PageResponseDTO<>(issues.map(issueMapper::toDto));
     }
 
     @Transactional(readOnly = true)
-    public IssueDTO getIssueById(UUID id) {
-        return issueMapper.issueToIssueDTO(issueRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found")));
+    public IssueDtoResponse getIssueById(UUID id) {
+        Issue issue = issueRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        Set<UUID> userIds = new HashSet<>();
+        userIds.add(issue.getReporterId());
+        if (issue.getAssignedId() != null) { userIds.add(issue.getAssignedId());}
+
+        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(
+                JwtContextHolder.getToken(),
+                userIds.stream().map(UUID::toString).toList()
+        );
+
+        Map<UUID, UserBasicDataDto> userMap = usersOpt
+                .orElse(List.of())
+                .stream()
+                .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
+
+        return getIssueDtoResponse(userMap, issue);
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> getIssuesByStatus(String status, Pageable pageable) {
+    public PageResponseDTO<IssueDtoResponse> getIssuesByStatus(String status, Pageable pageable) {
         Page<Issue> issues = issueRepository.findByStatus(status, pageable);
-        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
-        return new PageResponseDTO<>(issueDTOs);
+        return new PageResponseDTO<>(issues.map(issueMapper::toDto));
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> getIssuesByProjectId(UUID projectId, Pageable pageable) {
+    public PageResponseDTO<IssueDtoResponse> getIssuesByProjectId(UUID projectId, Pageable pageable) {
         Page<Issue> issues = issueRepository.findByProjectId(projectId, pageable);
-        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
-        return new PageResponseDTO<>(issueDTOs);
+        return new PageResponseDTO<>(issues.map(issueMapper::toDto));
     }
 
     @Transactional
-    public IssueDTO createIssue(IssueDTO issueDTO) {
-        if (issueDTO == null) {
+    public IssueDtoResponse createIssue(IssueDtoRequest issueDtoRequest) {
+        if (issueDtoRequest == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
         }
 
         UUID userId = JwtContextHolder.getUserId();
-        String token = JwtContextHolder.getToken();
 
-        if (!projectValidationService.validateProjectExists(issueDTO.getProjectId())) {
+        if (!projectValidationService.validateProjectExists(issueDtoRequest.getProjectId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
         }
 
-        if (issueDTO.getAssignedId() != null &&
-                !userValidationService.userExists(issueDTO.getAssignedId(), token)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-        }
-
-        issueDTO.setReporterId(userId);
-        if(issueDTO.getStatus() == null){
-            issueDTO.setStatus("OPEN");
-        }
-
-        Issue issue = issueMapper.issueDTOToIssue(issueDTO);
+        Issue issue = issueMapper.toEntity(issueDtoRequest);
+        issue.setReporterId(userId);
         issueRepository.save(issue);
-        issue.getDescriptions().forEach(description -> description.setIssue(issue));
+        issueMapper.linkDescriptions(issue);
         Issue savedIssue = issueRepository.save(issue);
-        issueRepository.flush();
 
-        if (savedIssue.getAssignedId() != null) {
-            try {
-                notificationService.sendNotification(
-                        savedIssue.getAssignedId(),
-                        "A new issue has been created to which you are assigned: " + savedIssue.getTitle(),
-                        "ISSUE_ASSIGNED",
-                        Map.of(
-                                "issueId", savedIssue.getId().toString(),
-                                "projectId", savedIssue.getProjectId().toString()
-                        )
-                );
-            } catch (Exception ignored) {}
-        }
-
-        return issueMapper.issueToIssueDTO(savedIssue);
+        return issueMapper.toDto(savedIssue);
     }
 
     @Transactional
-    public IssueDTO updateIssue(UUID id, IssueDTO updatedIssueDTO) {
+    public IssueDtoResponse updateIssue(UUID id, IssueDtoRequest updatedIssueDTO) {
         if (updatedIssueDTO == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
         }
@@ -125,15 +114,12 @@ public class IssueService {
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
+        if(updatedIssueDTO.getProjectId() != null && !updatedIssueDTO.getProjectId().equals(issue.getProjectId())){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The project id cannot change" );
+        }
+
         List<String> changedFields = new ArrayList<>();
         AtomicBoolean descriptionsChanged = new AtomicBoolean(false);
-
-        if (updatedIssueDTO.getTitle() == null || updatedIssueDTO.getTitle().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title cannot be null or blank");
-        }
-        if (updatedIssueDTO.getStatus() == null || updatedIssueDTO.getStatus().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status cannot be null or blank");
-        }
 
         if (!Objects.equals(issue.getTitle(), updatedIssueDTO.getTitle())) {
             changedFields.add("title");
@@ -152,30 +138,30 @@ public class IssueService {
             issue.setStatus(updatedIssueDTO.getStatus());
         }
 
-        if (updatedIssueDTO.getDescriptionsDTO() != null) {
-            for (DescriptionDTO descriptionDTO : updatedIssueDTO.getDescriptionsDTO()) {
-                if (descriptionDTO.getId() != null) {
+        if (updatedIssueDTO.getDescriptions() != null) {
+            for (DescriptionDtoRequest descriptionDtoRequest : updatedIssueDTO.getDescriptions()) {
+                if (descriptionDtoRequest.getId() != null) {
                     issue.getDescriptions().stream()
-                            .filter(description -> description.getId().equals(descriptionDTO.getId()))
+                            .filter(description -> description.getId().equals(descriptionDtoRequest.getId()))
                             .findFirst()
                             .ifPresent(description -> {
-                                if (!Objects.equals(description.getText(), descriptionDTO.getText())) {
-                                    description.setText(descriptionDTO.getText());
+                                if (!Objects.equals(description.getText(), descriptionDtoRequest.getText())) {
+                                    description.setText(descriptionDtoRequest.getText());
                                     descriptionsChanged.set(true);
                                 }
                             });
                 } else {
                     Description newDescription = new Description();
-                    newDescription.setText(descriptionDTO.getText());
+                    newDescription.setText(descriptionDtoRequest.getText());
                     newDescription.setIssue(issue);
                     issue.getDescriptions().add(newDescription);
                     descriptionsChanged.set(true);
                 }
             }
             boolean removed = issue.getDescriptions().removeIf(
-                    description -> description.getId() != null && updatedIssueDTO.getDescriptionsDTO().stream()
-                            .noneMatch(descriptionDTO ->
-                                    descriptionDTO.getId() != null && descriptionDTO.getId().equals(description.getId())
+                    description -> description.getId() != null && updatedIssueDTO.getDescriptions().stream()
+                            .noneMatch(descriptionDtoRequest ->
+                                    descriptionDtoRequest.getId() != null && descriptionDtoRequest.getId().equals(description.getId())
                             )
             );
             if (removed) {
@@ -211,7 +197,7 @@ public class IssueService {
             }
         }
 
-        return issueMapper.issueToIssueDTO(savedIssue);
+        return issueMapper.toDto(savedIssue);
     }
 
     @Transactional
@@ -222,33 +208,30 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueDTO reopenIssue(UUID id) {
+    public IssueDtoResponse reopenIssue(UUID id, Long newStatus) {
         UUID userId = JwtContextHolder.getUserId();
 
         return issueRepository.findById(id)
                 .map(issue -> {
-                    if ("RESOLVED".equalsIgnoreCase(issue.getStatus().toString()) || "CLOSED".equalsIgnoreCase(issue.getStatus().toString())) {
-                        issue.setStatus("REOPEN");
-                        Issue savedIssue = issueRepository.save(issue);
-                        try {
-                            auditService.logChange(id, userId, "UPDATE", "Issue reopened", savedIssue.getProjectId());
-                        }catch (Exception ignored){}
-                        return issueMapper.issueToIssueDTO(savedIssue);
-                    }
-                    throw new IllegalStateException("Issue is not in a closed state and cannot be reopened.");
+                    issue.setStatus(newStatus);
+                    Issue savedIssue = issueRepository.save(issue);
+                    try {
+                        auditService.logChange(id, userId, "UPDATE", "Issue reopened", savedIssue.getProjectId());
+                    }catch (Exception ignored){}
+                    return issueMapper.toDto(savedIssue);
                 })
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
     }
 
     @Transactional
-    public IssueDTO assignUserToIssue(UUID issueId, UUID assignedId) {
+    public IssueDtoResponse assignUserToIssue(UUID issueId, UUID assignedId) {
         UUID userId = JwtContextHolder.getUserId();
         String token = JwtContextHolder.getToken();
 
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
-        String auditDescription = "";
+        String auditDescription;
         if (assignedId == null) {
             issue.setAssignedId(null);
             auditDescription = "User unassigned to issue";
@@ -280,12 +263,12 @@ public class IssueService {
             } catch (Exception ignored) {}
         }
 
-        return issueMapper.issueToIssueDTO(savedIssue);
+        return issueMapper.toDto(savedIssue);
     }
 
     @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDTO> findIssues(String keyword, UUID projectId, UUID sprintId, String status,
-                                                String priority, UUID assignedId,
+    public PageResponseDTO<IssueDtoResponse> findIssues(String keyword, UUID projectId, UUID sprintId, Long status,
+                                                Long priority, Long type, UUID assignedId,
                                      Pageable pageable) {
 
         Specification<Issue> spec = Specification
@@ -294,12 +277,42 @@ public class IssueService {
                 .and(IssueSpecifications.hasSprint(sprintId))
                 .and(IssueSpecifications.hasStatus(status))
                 .and(IssueSpecifications.hasPriority(priority))
+                .and(IssueSpecifications.hasType(type))
                 .and(IssueSpecifications.hasAssigned(assignedId));
 
         Page<Issue> issues = issueRepository.findAll(spec, pageable);
-        Page<IssueDTO> issueDTOs = issues.map(issueMapper::issueToIssueDTO);
 
-        return new PageResponseDTO<>(issueDTOs);
+        Set<UUID> userIds = new HashSet<>();
+        issues.getContent().forEach(issue -> {
+            if (issue.getAssignedId() != null) userIds.add(issue.getAssignedId());
+            if (issue.getReporterId() != null) userIds.add(issue.getReporterId());
+        });
+
+        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(
+                JwtContextHolder.getToken(),
+                userIds.stream().map(UUID::toString).collect(Collectors.toList())
+        );
+
+        Map<UUID, UserBasicDataDto> userMap = usersOpt
+                .orElse(Collections.emptyList())
+                .stream()
+                .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
+
+        Page<IssueDtoResponse> mappedPage = issues.map(issue -> getIssueDtoResponse(userMap, issue));
+        return new PageResponseDTO<>(mappedPage);
+    }
+
+    private IssueDtoResponse getIssueDtoResponse(Map<UUID, UserBasicDataDto> userMap, Issue issue) {
+        IssueDtoResponse issueDtoResponse = issueMapper.toDto(issue);
+
+        issueDtoResponse.setReporterId(userMap.getOrDefault(issue.getReporterId(),
+                new UserBasicDataDto(issue.getReporterId(), null, null, null)));
+
+
+        issueDtoResponse.setAssignedId(userMap.getOrDefault(issue.getAssignedId(),
+                new UserBasicDataDto(issue.getAssignedId(), null, null, null)));
+
+        return issueDtoResponse;
     }
 
     @Transactional(readOnly = true)
@@ -314,17 +327,14 @@ public class IssueService {
 
         for (IssueDTO issueDTO : issues) {
             issueDTO.setReporterId(userId);
-            if (issueDTO.getStatus() == null) {
-                issueDTO.setStatus("OPEN");
-            }
 
-            Issue issue = issueMapper.issueDTOToIssue(issueDTO);
+            Issue issue = issueMapper.toEntityImport(issueDTO);
             issue.getDescriptions().forEach(description -> description.setIssue(issue));
             entities.add(issue);
         }
 
         List<Issue> saved = issueRepository.saveAll(entities);
-        return saved.stream().map(issueMapper::issueToIssueDTO).toList();
+        return saved.stream().map(issueMapper::toDtoImport).toList();
     }
 
     @Transactional

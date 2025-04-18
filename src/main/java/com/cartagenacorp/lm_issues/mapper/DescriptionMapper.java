@@ -1,16 +1,16 @@
 package com.cartagenacorp.lm_issues.mapper;
 
-import com.cartagenacorp.lm_issues.dto.DescriptionDTO;
+import com.cartagenacorp.lm_issues.dto.DescriptionDtoRequest;
+import com.cartagenacorp.lm_issues.dto.DescriptionDtoResponse;
 import com.cartagenacorp.lm_issues.entity.Description;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import org.mapstruct.*;
 
-@Mapper(componentModel = "spring")
+@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE, componentModel = MappingConstants.ComponentModel.SPRING)
 public interface DescriptionMapper {
+    Description toEntity(DescriptionDtoRequest descriptionDtoRequest);
 
-    @Mapping(target = "issueId", source = "issue.id")
-    DescriptionDTO descriptionToDescriptionDTO(Description description);
+    DescriptionDtoResponse toDto(Description description);
 
-    @Mapping(target = "issue.id", source = "issueId")
-    Description descriptionDTOToDescription(DescriptionDTO descriptionDTO);
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    Description partialUpdate(DescriptionDtoRequest descriptionDtoRequest, @MappingTarget Description description);
 }
