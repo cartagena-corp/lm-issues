@@ -11,6 +11,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -125,29 +126,43 @@ public class IssueController {
     @RequiresPermission({"ISSUE_CRUD", "ISSUE_READ"})
     public ResponseEntity<PageResponseDTO<IssueDtoResponse>> searchIssues(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) UUID projectId,
-            @RequestParam(required = false) UUID sprintId,
-            @RequestParam(required = false) Long status,
-            @RequestParam(required = false) Long priority,
-            @RequestParam(required = false) Long type,
+            @RequestParam(required = false) String projectId,
+            @RequestParam(required = false) String sprintId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false) String assignedId,
             @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        UUID uuid = null;
-        if (assignedId != null && !assignedId.isEmpty()) {
-            uuid = UUID.fromString(assignedId);
-        }
+        UUID assignedIdUuid = parseUUIDParam(assignedId);
+        UUID projectIdUuid = parseUUIDParam(projectId);
+        UUID sprintIdUuid = parseUUIDParam(sprintId);
+        Long statusParsed = parseLongParam(status);
+        Long priorityParsed = parseLongParam(priority);
+        Long typeParsed = parseLongParam(type);
 
         Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
 
         PageResponseDTO<IssueDtoResponse> results = issueService.findIssues(
-                keyword, projectId, sprintId, status, priority, type, uuid, pageable);
+                keyword, projectIdUuid, sprintIdUuid, statusParsed, priorityParsed, typeParsed, assignedIdUuid, pageable);
 
         return ResponseEntity.ok(results);
+    }
+
+    private Long parseLongParam(String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        if (value.equalsIgnoreCase("null")) return -1L;
+        return Long.valueOf(value);
+    }
+
+    private UUID parseUUIDParam(String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        if (value.equalsIgnoreCase("null")) return new UUID(0L, 0L);
+        return UUID.fromString(value);
     }
 
     @GetMapping("/validate/{id}")

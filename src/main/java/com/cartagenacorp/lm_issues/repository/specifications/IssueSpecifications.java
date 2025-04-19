@@ -9,6 +9,9 @@ import org.springframework.data.jpa.domain.Specification;
 import java.util.UUID;
 
 public class IssueSpecifications {
+
+    private static final Long NULL_FILTER_LONG = -1L;
+    private static final UUID NULL_FILTER_UUID = new UUID(0L, 0L);
     public static Specification<Issue> searchByKeyword(String keyword) {
         return (root, query, criteriaBuilder) -> {
             if (keyword == null || keyword.trim().isEmpty()) {
@@ -41,6 +44,9 @@ public class IssueSpecifications {
             if (sprintId == null) {
                 return criteriaBuilder.conjunction();
             }
+            if (sprintId.equals(NULL_FILTER_UUID)){
+                return criteriaBuilder.isNull(root.get("sprintId"));
+            }
             return criteriaBuilder.equal(root.get("sprintId"), sprintId);
         };
     }
@@ -49,6 +55,9 @@ public class IssueSpecifications {
         return (root, query, criteriaBuilder) -> {
             if (status == null) {
                 return criteriaBuilder.conjunction();
+            }
+            if (status.equals(NULL_FILTER_LONG)){
+                return criteriaBuilder.isNull(root.get("status"));
             }
             return criteriaBuilder.equal(root.get("status"), status);
         };
@@ -59,6 +68,9 @@ public class IssueSpecifications {
             if (priority == null) {
                 return criteriaBuilder.conjunction();
             }
+            if (priority.equals(NULL_FILTER_LONG)){
+                return criteriaBuilder.isNull(root.get("priority"));
+            }
             return criteriaBuilder.equal(root.get("priority"), priority);
         };
     }
@@ -67,6 +79,9 @@ public class IssueSpecifications {
         return (root, query, criteriaBuilder) -> {
             if (type == null) {
                 return criteriaBuilder.conjunction();
+            }
+            if (type.equals(NULL_FILTER_LONG)){
+                return criteriaBuilder.isNull(root.get("type"));
             }
             return criteriaBuilder.equal(root.get("type"), type);
         };
