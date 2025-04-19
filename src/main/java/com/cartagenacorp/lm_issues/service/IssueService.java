@@ -89,9 +89,15 @@ public class IssueService {
         }
 
         UUID userId = JwtContextHolder.getUserId();
+        String token = JwtContextHolder.getToken();
 
         if (!projectValidationService.validateProjectExists(issueDtoRequest.getProjectId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
+        }
+
+        if (issueDtoRequest.getAssignedId() != null &&
+                !userValidationService.userExists(issueDtoRequest.getAssignedId(), token)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
         }
 
         Issue issue = issueMapper.toEntity(issueDtoRequest);
@@ -99,6 +105,20 @@ public class IssueService {
         issueRepository.save(issue);
         issueMapper.linkDescriptions(issue);
         Issue savedIssue = issueRepository.save(issue);
+
+        if (savedIssue.getAssignedId() != null) {
+            try {
+                notificationService.sendNotification(
+                        savedIssue.getAssignedId(),
+                        "A new issue has been created to which you are assigned: " + savedIssue.getTitle(),
+                        "ISSUE_ASSIGNED",
+                        Map.of(
+                                "issueId", savedIssue.getId().toString(),
+                                "projectId", savedIssue.getProjectId().toString()
+                        )
+                );
+            } catch (Exception ignored) {}
+        }
 
         return issueMapper.toDto(savedIssue);
     }
@@ -116,6 +136,10 @@ public class IssueService {
 
         if(updatedIssueDTO.getProjectId() != null && !updatedIssueDTO.getProjectId().equals(issue.getProjectId())){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The project id cannot change" );
+        }
+
+        if(updatedIssueDTO.getAssignedId() != null ){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The assigned ID is not accepted" );
         }
 
         List<String> changedFields = new ArrayList<>();
@@ -136,6 +160,10 @@ public class IssueService {
         if (!Objects.equals(issue.getStatus(), updatedIssueDTO.getStatus())) {
             changedFields.add("status");
             issue.setStatus(updatedIssueDTO.getStatus());
+        }
+        if (!Objects.equals(issue.getType(), updatedIssueDTO.getType())) {
+            changedFields.add("type");
+            issue.setType(updatedIssueDTO.getType());
         }
 
         if (updatedIssueDTO.getDescriptions() != null) {

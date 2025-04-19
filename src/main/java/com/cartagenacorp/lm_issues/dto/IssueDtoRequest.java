@@ -37,4 +37,6 @@ public class IssueDtoRequest implements Serializable {
 
     @NotNull(message = "Type is required")
     private Long type;
+
+    private UUID assignedId;
 }
