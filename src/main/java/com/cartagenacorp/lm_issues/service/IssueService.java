@@ -53,21 +53,7 @@ public class IssueService {
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
-        Set<UUID> userIds = new HashSet<>();
-        userIds.add(issue.getReporterId());
-        if (issue.getAssignedId() != null) { userIds.add(issue.getAssignedId());}
-
-        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(
-                JwtContextHolder.getToken(),
-                userIds.stream().map(UUID::toString).toList()
-        );
-
-        Map<UUID, UserBasicDataDto> userMap = usersOpt
-                .orElse(List.of())
-                .stream()
-                .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
-
-        return getIssueDtoResponse(userMap, issue);
+        return getIssueDtoResponse(issue);
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +106,7 @@ public class IssueService {
             } catch (Exception ignored) {}
         }
 
-        return issueMapper.toDto(savedIssue);
+        return getIssueDtoResponse(issue);
     }
 
     @Transactional
@@ -341,6 +327,24 @@ public class IssueService {
                 new UserBasicDataDto(issue.getAssignedId(), null, null, null)));
 
         return issueDtoResponse;
+    }
+
+    private IssueDtoResponse getIssueDtoResponse(Issue issue) {
+        Set<UUID> userIds = new HashSet<>();
+        userIds.add(issue.getReporterId());
+        if (issue.getAssignedId() != null) { userIds.add(issue.getAssignedId());}
+
+        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(
+                JwtContextHolder.getToken(),
+                userIds.stream().map(UUID::toString).toList()
+        );
+
+        Map<UUID, UserBasicDataDto> userMap = usersOpt
+                .orElse(List.of())
+                .stream()
+                .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
+
+        return getIssueDtoResponse(userMap, issue);
     }
 
     @Transactional(readOnly = true)
