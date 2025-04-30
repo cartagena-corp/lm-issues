@@ -159,7 +159,8 @@ public class IssueService {
                             .filter(description -> description.getId().equals(descriptionDtoRequest.getId()))
                             .findFirst()
                             .ifPresent(description -> {
-                                if (!Objects.equals(description.getText(), descriptionDtoRequest.getText())) {
+                                if (!Objects.equals(description.getText(), descriptionDtoRequest.getText()) ||
+                                        !Objects.equals(description.getTitle(), descriptionDtoRequest.getTitle())) {
                                     description.setText(descriptionDtoRequest.getText());
                                     descriptionsChanged.set(true);
                                 }

@@ -12,5 +12,6 @@ import java.util.UUID;
 @Value
 public class DescriptionDtoResponse implements Serializable {
     UUID id;
+    String title;
     String text;
 }

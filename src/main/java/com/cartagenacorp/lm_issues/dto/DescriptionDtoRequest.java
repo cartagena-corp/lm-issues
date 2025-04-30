@@ -16,5 +16,6 @@ import java.util.UUID;
 @NoArgsConstructor
 public class DescriptionDtoRequest implements Serializable {
     private UUID id;
+    private String title;
     private String text;
 }

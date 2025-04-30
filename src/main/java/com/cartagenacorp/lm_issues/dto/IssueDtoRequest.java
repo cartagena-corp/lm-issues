@@ -1,6 +1,7 @@
 package com.cartagenacorp.lm_issues.dto;
 
 import com.cartagenacorp.lm_issues.entity.Issue;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -25,6 +26,7 @@ public class IssueDtoRequest implements Serializable {
     private List<DescriptionDtoRequest> descriptions = new ArrayList<>();
 
     @NotNull(message = "Estimated time is required")
+    @Min(value = 0, message = "Estimated time must be zero or greater")
     private Integer estimatedTime;
 
     private UUID projectId;
