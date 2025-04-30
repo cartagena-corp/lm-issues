@@ -172,6 +172,7 @@ public class IssueService {
                             });
                 } else {
                     Description newDescription = new Description();
+                    newDescription.setTitle(descriptionDtoRequest.getTitle());
                     newDescription.setText(descriptionDtoRequest.getText());
                     newDescription.setIssue(issue);
                     issue.getDescriptions().add(newDescription);
