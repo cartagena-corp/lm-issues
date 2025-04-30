@@ -92,6 +92,10 @@ public class IssueService {
         issueMapper.linkDescriptions(issue);
         Issue savedIssue = issueRepository.save(issue);
 
+        try {
+            auditService.logChange(savedIssue.getId(), userId, "CREATE", "Issue created", savedIssue.getProjectId());
+        }catch (Exception ignored){}
+
         if (savedIssue.getAssignedId() != null) {
             try {
                 notificationService.sendNotification(
@@ -161,6 +165,7 @@ public class IssueService {
                             .ifPresent(description -> {
                                 if (!Objects.equals(description.getText(), descriptionDtoRequest.getText()) ||
                                         !Objects.equals(description.getTitle(), descriptionDtoRequest.getTitle())) {
+                                    description.setTitle(descriptionDtoRequest.getTitle());
                                     description.setText(descriptionDtoRequest.getText());
                                     descriptionsChanged.set(true);
                                 }
@@ -212,7 +217,7 @@ public class IssueService {
             }
         }
 
-        return issueMapper.toDto(savedIssue);
+        return getIssueDtoResponse(savedIssue);
     }
 
     @Transactional
@@ -261,7 +266,7 @@ public class IssueService {
         Issue savedIssue = issueRepository.save(issue);
 
         try {
-            auditService.logChange(issueId, userId, "UPDATE", auditDescription, savedIssue.getProjectId());
+            auditService.logChange(savedIssue.getId(), userId, "ASSIGN", auditDescription, savedIssue.getProjectId());
         } catch (Exception ignored){}
 
         if (savedIssue.getAssignedId() != null) {
@@ -380,6 +385,10 @@ public class IssueService {
 
         for (Issue issue : issues) {
             issue.setSprintId(sprintId);
+            try {
+                UUID userId = JwtContextHolder.getUserId();
+                auditService.logChange(issue.getId(), userId, "SPRINT", "Sprint assigned: " + sprintId, issue.getProjectId());
+            } catch (Exception ignored){}
         }
         issueRepository.saveAll(issues);
     }
@@ -394,6 +403,10 @@ public class IssueService {
 
         for (Issue issue : issues) {
             issue.setSprintId(null);
+            try {
+                UUID userId = JwtContextHolder.getUserId();
+                auditService.logChange(issue.getId(), userId, "SPRINT", "Sprint unassigned", issue.getProjectId());
+            } catch (Exception ignored){}
         }
         issueRepository.saveAll(issues);
     }
