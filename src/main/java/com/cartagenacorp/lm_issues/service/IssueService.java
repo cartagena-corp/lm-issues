@@ -105,7 +105,9 @@ public class IssueService {
                         Map.of(
                                 "issueId", savedIssue.getId().toString(),
                                 "projectId", savedIssue.getProjectId().toString()
-                        )
+                        ),
+                        savedIssue.getProjectId(),
+                        savedIssue.getId()
                 );
             } catch (Exception ignored) {}
         }
@@ -212,7 +214,9 @@ public class IssueService {
                             Map.of(
                                     "issueId", savedIssue.getId().toString(),
                                     "projectId", savedIssue.getProjectId().toString()
-                            )
+                            ),
+                            savedIssue.getProjectId(),
+                            savedIssue.getId()
                     );
                 } catch (Exception ignored) {}
             }
@@ -279,7 +283,9 @@ public class IssueService {
                         Map.of(
                                 "issueId", savedIssue.getId().toString(),
                                 "projectId", savedIssue.getProjectId().toString()
-                        )
+                        ),
+                        savedIssue.getProjectId(),
+                        savedIssue.getId()
                 );
             } catch (Exception ignored) {}
         }

@@ -15,4 +15,6 @@ public class NotificationDTO {
     private String message;
     private String type;
     private Map<String, Object> metadata;
+    private UUID projectId;
+    private UUID issueId;
 }

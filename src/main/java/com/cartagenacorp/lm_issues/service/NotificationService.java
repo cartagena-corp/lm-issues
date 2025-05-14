@@ -24,7 +24,7 @@ public class NotificationService {
         this.restTemplate = restTemplate;
     }
 
-    public void sendNotification(UUID userId, String message, String type, Map<String, Object> metadata) {
+    public void sendNotification(UUID userId, String message, String type, Map<String, Object> metadata, UUID projectId, UUID issueId) {
         if (userId == null || message == null || type == null) {
             throw new IllegalArgumentException("Missing required notification fields");
         }
@@ -36,6 +36,8 @@ public class NotificationService {
         request.setMessage(message);
         request.setType(type);
         request.setMetadata(metadata);
+        request.setProjectId(projectId);
+        request.setIssueId(issueId);
 
         try {
             restTemplate.postForEntity(url, request, Void.class);
