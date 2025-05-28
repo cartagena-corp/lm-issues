@@ -9,9 +9,11 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: 'false'
+server:
+  port: 8090
 app:
   cors:
-    allowed-origins: https://cartagenacorporation.com
+    allowed-origins: https://cartagenacorporation.com,https://www.cartagenacorporation.com
   jwt:
     secret: ${JWT_SECRET}
 auth:
