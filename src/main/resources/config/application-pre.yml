@@ -8,7 +8,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    open-in-view: 'false'
+    open-in-view: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 server:
   port: 8090
 app:
@@ -18,16 +19,16 @@ app:
     secret: ${JWT_SECRET}
 auth:
   service:
-    url: https://lm-oauth.cartagenacorporation.com/api/oauth
+    url: http://localhost:8081/api/oauth
 project:
   service:
-    url: https://lm-projects.cartagenacorporation.com/api/projects
+    url: http://localhost:8082/api/projects
 sprint:
   service:
-    url: https://lm-sprint.cartagenacorporation.com/api/sprints
+    url: http://localhost:8089/api/sprints
 audit:
   service:
-    url: https://lm-audit.cartagenacorporation.com/api/audit
+    url: http://localhost:8083/api/audit
 notification:
   service:
-    url: https://lm-notifications.cartagenacorporation.com/api/notifications
+    url: http://localhost:8086/api/notifications
