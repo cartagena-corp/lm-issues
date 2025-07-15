@@ -340,11 +340,11 @@ public class IssueService {
         IssueDtoResponse issueDtoResponse = issueMapper.toDto(issue);
 
         issueDtoResponse.setReporterId(userMap.getOrDefault(issue.getReporterId(),
-                new UserBasicDataDto(issue.getReporterId(), null, null, null)));
+                new UserBasicDataDto(issue.getReporterId(), null, null, null, null)));
 
 
         issueDtoResponse.setAssignedId(userMap.getOrDefault(issue.getAssignedId(),
-                new UserBasicDataDto(issue.getAssignedId(), null, null, null)));
+                new UserBasicDataDto(issue.getAssignedId(), null, null, null, null)));
 
         return issueDtoResponse;
     }
