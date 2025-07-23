@@ -21,7 +21,7 @@ public class Description {
     @Column(name = "title", nullable = false, length = 500)
     private String title;
 
-    @Column(name = "text", nullable = false, length = 1500)
+    @Column(name = "text", nullable = false, length = 5000)
     private String text;
 
     @ManyToOne()
