@@ -302,7 +302,7 @@ public class IssueService {
 
     @Transactional(readOnly = true)
     public PageResponseDTO<IssueDtoResponse> findIssues(String keyword, UUID projectId, UUID sprintId, Long status,
-                                                Long priority, Long type, UUID assignedId,
+                                                Long priority, Long type, List<UUID> assignedIds,
                                      Pageable pageable) {
 
         Specification<Issue> spec = Specification
@@ -312,7 +312,7 @@ public class IssueService {
                 .and(IssueSpecifications.hasStatus(status))
                 .and(IssueSpecifications.hasPriority(priority))
                 .and(IssueSpecifications.hasType(type))
-                .and(IssueSpecifications.hasAssigned(assignedId));
+                .and(IssueSpecifications.hasAssignedIn(assignedIds));
 
         Page<Issue> issues = issueRepository.findAll(spec, pageable);
 
@@ -379,6 +379,9 @@ public class IssueService {
 
         for (IssueDTO issueDTO : issues) {
             issueDTO.setReporterId(userId);
+
+//            if (issueDTO.getDescriptionsDTO() == null)
+//                issueDTO.setDescriptionsDTO(new ArrayList<>());
 
             Issue issue = issueMapper.toEntityImport(issueDTO);
             issue.getDescriptions().forEach(description -> description.setIssue(issue));

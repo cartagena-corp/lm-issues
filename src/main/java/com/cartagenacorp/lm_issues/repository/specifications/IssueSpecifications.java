@@ -6,6 +6,7 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.List;
 import java.util.UUID;
 
 public class IssueSpecifications {
@@ -87,12 +88,12 @@ public class IssueSpecifications {
         };
     }
 
-    public static Specification<Issue> hasAssigned(UUID assignedId) {
+    public static Specification<Issue> hasAssignedIn(List<UUID> assignedIds) {
         return (root, query, criteriaBuilder) -> {
-            if (assignedId == null) {
+            if (assignedIds == null || assignedIds.isEmpty()) {
                 return criteriaBuilder.conjunction();
             }
-            return criteriaBuilder.equal(root.get("assignedId"), assignedId);
+            return root.get("assignedId").in(assignedIds);
         };
     }
 }

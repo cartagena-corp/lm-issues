@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -130,13 +131,15 @@ public class IssueController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) String assignedId,
+            @RequestParam(required = false) List<String> assignedIds,
             @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        UUID assignedIdUuid = parseUUIDParam(assignedId);
+        List<UUID> assignedIdUuids = assignedIds != null
+                ? assignedIds.stream().map(UUID::fromString).toList()
+                : Collections.emptyList();
         UUID projectIdUuid = parseUUIDParam(projectId);
         UUID sprintIdUuid = parseUUIDParam(sprintId);
         Long statusParsed = parseLongParam(status);
@@ -147,7 +150,7 @@ public class IssueController {
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
 
         PageResponseDTO<IssueDtoResponse> results = issueService.findIssues(
-                keyword, projectIdUuid, sprintIdUuid, statusParsed, priorityParsed, typeParsed, assignedIdUuid, pageable);
+                keyword, projectIdUuid, sprintIdUuid, statusParsed, priorityParsed, typeParsed, assignedIdUuids, pageable);
 
         return ResponseEntity.ok(results);
     }
