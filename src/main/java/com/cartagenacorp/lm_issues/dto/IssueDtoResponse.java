@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +29,9 @@ public class IssueDtoResponse implements Serializable {
     Long type;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    LocalDate startDate;
+    LocalDate endDate;
+    LocalDate realDate;
     UserBasicDataDto reporterId;
     UserBasicDataDto assignedId;
 }
