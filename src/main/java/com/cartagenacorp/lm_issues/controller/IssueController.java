@@ -147,7 +147,8 @@ public class IssueController {
         Long typeParsed = parseLongParam(type);
 
         Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        Sort sort = Sort.by(sortDirection, sortBy).and(Sort.by(sortDirection, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         PageResponseDTO<IssueDtoResponse> results = issueService.findIssues(
                 keyword, projectIdUuid, sprintIdUuid, statusParsed, priorityParsed, typeParsed, assignedIdUuids, pageable);
