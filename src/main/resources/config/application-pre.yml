@@ -32,3 +32,6 @@ audit:
 notification:
   service:
     url: http://localhost:8086/api/notifications
+comment:
+  service:
+    url: http://localhost:8084/api/comments
