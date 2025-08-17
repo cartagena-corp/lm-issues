@@ -46,4 +46,13 @@ public class JwtTokenUtil {
         String id = getAllClaimsFromToken(token).getSubject();
         return UUID.fromString(id);
     }
+
+    public UUID getOrganizationId(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        String organizationIdStr = claims.get("organization_id", String.class);
+        if (organizationIdStr == null) {
+            throw new JwtException("El claim 'organization_id' no existe en el token.");
+        }
+        return UUID.fromString(organizationIdStr);
+    }
 }

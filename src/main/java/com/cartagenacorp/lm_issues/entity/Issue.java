@@ -70,4 +70,7 @@ public class Issue {
 
     @Column(name = "real_date")
     private LocalDate realDate;
+
+    @Column(name = "organization_id")
+    private UUID organizationId;
 }

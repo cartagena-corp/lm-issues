@@ -34,4 +34,5 @@ public class IssueDtoResponse implements Serializable {
     LocalDate realDate;
     UserBasicDataDto reporterId;
     UserBasicDataDto assignedId;
+    UUID organizationId;
 }
