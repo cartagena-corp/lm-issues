@@ -164,18 +164,6 @@ public class IssueService {
             changedFields.add("type");
             issue.setType(updatedIssueDTO.getType());
         }
-        if (!Objects.equals(issue.getStartDate(), updatedIssueDTO.getStartDate())) {
-            changedFields.add("startDate");
-            issue.setStartDate(updatedIssueDTO.getStartDate());
-        }
-        if (!Objects.equals(issue.getEndDate(), updatedIssueDTO.getEndDate())) {
-            changedFields.add("endDate");
-            issue.setEndDate(updatedIssueDTO.getEndDate());
-        }
-        if (!Objects.equals(issue.getRealDate(), updatedIssueDTO.getRealDate())) {
-            changedFields.add("realDate");
-            issue.setRealDate(updatedIssueDTO.getRealDate());
-        }
 
         if (updatedIssueDTO.getDescriptions() != null) {
             for (DescriptionDtoRequest descriptionDtoRequest : updatedIssueDTO.getDescriptions()) {

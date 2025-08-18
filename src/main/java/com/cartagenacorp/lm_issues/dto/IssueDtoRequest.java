@@ -9,7 +9,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +41,4 @@ public class IssueDtoRequest implements Serializable {
     private Long type;
 
     private UUID assignedId;
-    private LocalDate startDate;
-    private LocalDate endDate;
-    private LocalDate realDate;
 }
