@@ -15,4 +15,5 @@ public class UserBasicDataDto {
     String lastName;
     String picture;
     String email;
+    String role;
 }

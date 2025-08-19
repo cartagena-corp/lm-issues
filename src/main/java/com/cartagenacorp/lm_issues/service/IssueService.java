@@ -7,7 +7,6 @@ import com.cartagenacorp.lm_issues.entity.Issue;
 import com.cartagenacorp.lm_issues.mapper.IssueMapper;
 import com.cartagenacorp.lm_issues.repository.IssueRepository;
 import com.cartagenacorp.lm_issues.util.JwtContextHolder;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,46 +27,19 @@ import java.util.stream.Collectors;
 public class IssueService {
     private final IssueRepository issueRepository;
     private final IssueMapper issueMapper;
-    private final UserValidationService userValidationService;
-    private final ProjectValidationService projectValidationService;
+    private final UserExternalService userExternalService;
+    private final ProjectExternalService projectExternalService;
     private final AuditService auditService;
     private final NotificationService notificationService;
 
-    @Autowired
-    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserValidationService userValidationService,
-                        ProjectValidationService projectValidationService, AuditService auditService, NotificationService notificationService) {
+    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserExternalService userExternalService,
+                        ProjectExternalService projectExternalService, AuditService auditService, NotificationService notificationService) {
         this.issueRepository = issueRepository;
         this.issueMapper = issueMapper;
-        this.userValidationService = userValidationService;
-        this.projectValidationService = projectValidationService;
+        this.userExternalService = userExternalService;
+        this.projectExternalService = projectExternalService;
         this.auditService = auditService;
         this.notificationService = notificationService;
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDtoResponse> getAllIssues(Pageable pageable) {
-        Page<Issue> issues = issueRepository.findAll(pageable);
-        return new PageResponseDTO<>(issues.map(issueMapper::toDto));
-    }
-
-    @Transactional(readOnly = true)
-    public IssueDtoResponse getIssueById(UUID id) {
-        Issue issue = issueRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
-
-        return getIssueDtoResponse(issue);
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDtoResponse> getIssuesByStatus(String status, Pageable pageable) {
-        Page<Issue> issues = issueRepository.findByStatus(status, pageable);
-        return new PageResponseDTO<>(issues.map(issueMapper::toDto));
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDtoResponse> getIssuesByProjectId(UUID projectId, Pageable pageable) {
-        Page<Issue> issues = issueRepository.findByProjectId(projectId, pageable);
-        return new PageResponseDTO<>(issues.map(issueMapper::toDto));
     }
 
     @Transactional
@@ -78,18 +50,24 @@ public class IssueService {
 
         UUID userId = JwtContextHolder.getUserId();
         String token = JwtContextHolder.getToken();
+        UUID organizationId = JwtContextHolder.getOrganizationId();
 
-        if (!projectValidationService.validateProjectExists(issueDtoRequest.getProjectId())) {
+        if (!projectExternalService.validateProjectExists(issueDtoRequest.getProjectId(), token)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
         }
 
+        if (!projectExternalService.validateProjectParticipant(issueDtoRequest.getProjectId(), token)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+        }
+
         if (issueDtoRequest.getAssignedId() != null &&
-                !userValidationService.userExists(issueDtoRequest.getAssignedId(), token)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+                !userExternalService.userExists(issueDtoRequest.getAssignedId(), token)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Assigned user not found");
         }
 
         Issue issue = issueMapper.toEntity(issueDtoRequest);
         issue.setReporterId(userId);
+        issue.setOrganizationId(organizationId);
         issueRepository.save(issue);
         issueMapper.linkDescriptions(issue);
         Issue savedIssue = issueRepository.save(issue);
@@ -123,6 +101,79 @@ public class IssueService {
     }
 
     @Transactional
+    public List<IssueDTO> createIssuesBatch(List<IssueDTO> issues) {
+        UUID userId = JwtContextHolder.getUserId();
+        UUID organizationId = JwtContextHolder.getOrganizationId();
+
+        List<Issue> entities = new ArrayList<>();
+
+
+        for (IssueDTO issueDTO : issues) {
+            issueDTO.setReporterId(userId);
+            issueDTO.setOrganizationId(organizationId);
+           // if (issueDTO.getDescriptionsDTO() == null) { issueDTO.setDescriptionsDTO(new ArrayList<>()); }
+            Issue issue = issueMapper.toEntityImport(issueDTO);
+            issue.getDescriptions().forEach(description -> description.setIssue(issue));
+            entities.add(issue);
+        }
+
+        List<Issue> saved = issueRepository.saveAll(entities);
+        return saved.stream().map(issueMapper::toDtoImport).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponseDTO<IssueDtoResponse> findIssues(String keyword, UUID projectId, UUID sprintId, Long status,
+                                                        Long priority, Long type, List<UUID> assignedIds,
+                                                        Pageable pageable) {
+
+        if (!projectExternalService.validateProjectParticipant(projectId, JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+        }
+
+        Specification<Issue> spec = Specification
+                .where(IssueSpecifications.searchByKeyword(keyword))
+                .and(IssueSpecifications.hasProject(projectId))
+                .and(IssueSpecifications.hasSprint(sprintId))
+                .and(IssueSpecifications.hasStatus(status))
+                .and(IssueSpecifications.hasPriority(priority))
+                .and(IssueSpecifications.hasType(type))
+                .and(IssueSpecifications.hasAssignedIn(assignedIds));
+
+        Page<Issue> issues = issueRepository.findAll(spec, pageable);
+
+        Set<UUID> userIds = new HashSet<>();
+        issues.getContent().forEach(issue -> {
+            if (issue.getAssignedId() != null) userIds.add(issue.getAssignedId());
+            if (issue.getReporterId() != null) userIds.add(issue.getReporterId());
+        });
+
+        List<UserBasicDataDto> usersOpt = userExternalService.getUsersData(
+                JwtContextHolder.getToken(),
+                userIds.stream()
+                        .map(UUID::toString)
+                        .collect(Collectors.toList())
+        );
+
+        Map<UUID, UserBasicDataDto> userMap = usersOpt.stream()
+                .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
+
+        Page<IssueDtoResponse> mappedPage = issues.map(issue -> getIssueDtoResponse(userMap, issue));
+        return new PageResponseDTO<>(mappedPage);
+    }
+
+    @Transactional(readOnly = true)
+    public IssueDtoResponse getIssueById(UUID id) {
+        Issue issue = issueRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+        }
+
+        return getIssueDtoResponse(issue);
+    }
+
+    @Transactional
     public IssueDtoResponse updateIssue(UUID id, IssueDtoRequest updatedIssueDTO) {
         if (updatedIssueDTO == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
@@ -132,6 +183,10 @@ public class IssueService {
 
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+        }
 
         if(updatedIssueDTO.getProjectId() != null && !updatedIssueDTO.getProjectId().equals(issue.getProjectId())){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The project id cannot change" );
@@ -163,6 +218,18 @@ public class IssueService {
         if (!Objects.equals(issue.getType(), updatedIssueDTO.getType())) {
             changedFields.add("type");
             issue.setType(updatedIssueDTO.getType());
+        }
+        if (!Objects.equals(issue.getStartDate(), updatedIssueDTO.getStartDate())) {
+            changedFields.add("startDate");
+            issue.setStartDate(updatedIssueDTO.getStartDate());
+        }
+        if (!Objects.equals(issue.getEndDate(), updatedIssueDTO.getEndDate())) {
+            changedFields.add("endDate");
+            issue.setEndDate(updatedIssueDTO.getEndDate());
+        }
+        if (!Objects.equals(issue.getRealDate(), updatedIssueDTO.getRealDate())) {
+            changedFields.add("realDate");
+            issue.setRealDate(updatedIssueDTO.getRealDate());
         }
 
         if (updatedIssueDTO.getDescriptions() != null) {
@@ -236,23 +303,12 @@ public class IssueService {
     public void deleteIssue(UUID id) {
         Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+        }
+
         issueRepository.delete(issue);
-    }
-
-    @Transactional
-    public IssueDtoResponse reopenIssue(UUID id, Long newStatus) {
-        UUID userId = JwtContextHolder.getUserId();
-
-        return issueRepository.findById(id)
-                .map(issue -> {
-                    issue.setStatus(newStatus);
-                    Issue savedIssue = issueRepository.save(issue);
-                    try {
-                        auditService.logChange(id, userId, "UPDATE", "Issue reopened", savedIssue.getProjectId());
-                    }catch (Exception ignored){}
-                    return issueMapper.toDto(savedIssue);
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
     }
 
     @Transactional
@@ -263,12 +319,16 @@ public class IssueService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
+        if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+        }
+
         String auditDescription;
         if (assignedId == null) {
             issue.setAssignedId(null);
             auditDescription = "User unassigned to issue";
         } else {
-            if (!userValidationService.userExists(assignedId, token)) {
+            if (!userExternalService.userExists(assignedId, token)) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
             }
             issue.setAssignedId(assignedId);
@@ -300,51 +360,15 @@ public class IssueService {
         return issueMapper.toDto(savedIssue);
     }
 
-    @Transactional(readOnly = true)
-    public PageResponseDTO<IssueDtoResponse> findIssues(String keyword, UUID projectId, UUID sprintId, Long status,
-                                                Long priority, Long type, List<UUID> assignedIds,
-                                     Pageable pageable) {
-
-        Specification<Issue> spec = Specification
-                .where(IssueSpecifications.searchByKeyword(keyword))
-                .and(IssueSpecifications.hasProject(projectId))
-                .and(IssueSpecifications.hasSprint(sprintId))
-                .and(IssueSpecifications.hasStatus(status))
-                .and(IssueSpecifications.hasPriority(priority))
-                .and(IssueSpecifications.hasType(type))
-                .and(IssueSpecifications.hasAssignedIn(assignedIds));
-
-        Page<Issue> issues = issueRepository.findAll(spec, pageable);
-
-        Set<UUID> userIds = new HashSet<>();
-        issues.getContent().forEach(issue -> {
-            if (issue.getAssignedId() != null) userIds.add(issue.getAssignedId());
-            if (issue.getReporterId() != null) userIds.add(issue.getReporterId());
-        });
-
-        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(
-                JwtContextHolder.getToken(),
-                userIds.stream().map(UUID::toString).collect(Collectors.toList())
-        );
-
-        Map<UUID, UserBasicDataDto> userMap = usersOpt
-                .orElse(Collections.emptyList())
-                .stream()
-                .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
-
-        Page<IssueDtoResponse> mappedPage = issues.map(issue -> getIssueDtoResponse(userMap, issue));
-        return new PageResponseDTO<>(mappedPage);
-    }
-
     private IssueDtoResponse getIssueDtoResponse(Map<UUID, UserBasicDataDto> userMap, Issue issue) {
         IssueDtoResponse issueDtoResponse = issueMapper.toDto(issue);
 
         issueDtoResponse.setReporterId(userMap.getOrDefault(issue.getReporterId(),
-                new UserBasicDataDto(issue.getReporterId(), null, null, null, null)));
+                new UserBasicDataDto(issue.getReporterId(), null, null, null, null, null)));
 
 
         issueDtoResponse.setAssignedId(userMap.getOrDefault(issue.getAssignedId(),
-                new UserBasicDataDto(issue.getAssignedId(), null, null, null, null)));
+                new UserBasicDataDto(issue.getAssignedId(), null, null, null, null, null)));
 
         return issueDtoResponse;
     }
@@ -354,14 +378,12 @@ public class IssueService {
         userIds.add(issue.getReporterId());
         if (issue.getAssignedId() != null) { userIds.add(issue.getAssignedId());}
 
-        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(
+        List<UserBasicDataDto> usersOpt = userExternalService.getUsersData(
                 JwtContextHolder.getToken(),
                 userIds.stream().map(UUID::toString).toList()
         );
 
-        Map<UUID, UserBasicDataDto> userMap = usersOpt
-                .orElse(List.of())
-                .stream()
+        Map<UUID, UserBasicDataDto> userMap = usersOpt.stream()
                 .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
 
         return getIssueDtoResponse(userMap, issue);
@@ -370,26 +392,6 @@ public class IssueService {
     @Transactional(readOnly = true)
     public boolean issueExists(UUID id){
         return issueRepository.existsById(id);
-    }
-
-    @Transactional
-    public List<IssueDTO> createIssuesBatch(List<IssueDTO> issues) {
-        UUID userId = JwtContextHolder.getUserId();
-        List<Issue> entities = new ArrayList<>();
-
-        for (IssueDTO issueDTO : issues) {
-            issueDTO.setReporterId(userId);
-
-//            if (issueDTO.getDescriptionsDTO() == null)
-//                issueDTO.setDescriptionsDTO(new ArrayList<>());
-
-            Issue issue = issueMapper.toEntityImport(issueDTO);
-            issue.getDescriptions().forEach(description -> description.setIssue(issue));
-            entities.add(issue);
-        }
-
-        List<Issue> saved = issueRepository.saveAll(entities);
-        return saved.stream().map(issueMapper::toDtoImport).toList();
     }
 
     @Transactional
