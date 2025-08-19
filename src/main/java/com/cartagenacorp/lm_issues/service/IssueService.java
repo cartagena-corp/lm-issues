@@ -305,17 +305,6 @@ public class IssueService {
                                                 Long priority, Long type, List<UUID> assignedIds,
                                      Pageable pageable) {
 
-        UUID currentUserId = JwtContextHolder.getUserId();
-        String token = JwtContextHolder.getToken();
-
-        if (projectId != null) {
-            List<UUID> participantIds = projectValidationService.getParticipantIds(projectId, token);
-
-            if (!participantIds.contains(currentUserId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to view this project");
-            }
-        }
-
         Specification<Issue> spec = Specification
                 .where(IssueSpecifications.searchByKeyword(keyword))
                 .and(IssueSpecifications.hasProject(projectId))
