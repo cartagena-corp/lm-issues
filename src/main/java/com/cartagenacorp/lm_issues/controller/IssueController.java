@@ -93,6 +93,7 @@ public class IssueController {
     }
 
     @DeleteMapping("/batch")
+    @RequiresPermission({"ISSUE_DELETE"})
     public ResponseEntity<Void> deleteIssues(@RequestBody List<UUID> ids) {
         issueService.deleteIssues(ids);
         return ResponseEntity.noContent().build();
