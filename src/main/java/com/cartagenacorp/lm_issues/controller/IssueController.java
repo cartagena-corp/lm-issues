@@ -92,6 +92,12 @@ public class IssueController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/batch")
+    public ResponseEntity<Void> deleteIssues(@RequestBody List<UUID> ids) {
+        issueService.deleteIssues(ids);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/assignUser/{id}")
     @RequiresPermission({"ISSUE_UPDATE"})
     public ResponseEntity<?> assignUsersToIssue(@PathVariable String id, @RequestBody(required = false) UUID userId) {

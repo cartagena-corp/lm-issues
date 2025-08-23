@@ -312,6 +312,21 @@ public class IssueService {
     }
 
     @Transactional
+    public void deleteIssues(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("La lista de IDs no puede estar vacía");
+        }
+
+        ids.forEach(id -> {
+            if (!issueRepository.existsById(id)) {
+                throw new IllegalArgumentException("No existe un issue con ID: " + id);
+            }
+        });
+
+        issueRepository.deleteAllById(ids);
+    }
+
+    @Transactional
     public IssueDtoResponse assignUserToIssue(UUID issueId, UUID assignedId) {
         UUID userId = JwtContextHolder.getUserId();
         String token = JwtContextHolder.getToken();
