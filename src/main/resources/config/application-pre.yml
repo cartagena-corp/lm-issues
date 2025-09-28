@@ -15,6 +15,7 @@ server:
 app:
   cors:
     allowed-origins: https://cartagenacorporation.com,https://www.cartagenacorporation.com
+    allowed-origins-patterns: https://*.cartagenacorporation.com
   jwt:
     secret: ${JWT_SECRET}
 auth:
