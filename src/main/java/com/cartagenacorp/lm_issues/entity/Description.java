@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -27,4 +29,7 @@ public class Description {
     @ManyToOne()
     @JoinColumn(name = "issue_id")
     private Issue issue;
+
+    @OneToMany(mappedBy = "description", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DescriptionFile> attachments = new ArrayList<>();
 }

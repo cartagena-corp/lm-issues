@@ -9,9 +9,19 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: 'false'
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 50MB
+server:
+  port: 8080
+file:
+  upload-dir: C:/Users/Diego/Desktop/description-uploads
+  upload-access-url: http://localhost:8080/description-uploads/
 app:
   cors:
     allowed-origins: http://localhost:3000
+    allowed-origins-patterns: https://*.cartagenacorporation.com
   jwt:
     secret: ${JWT_SECRET}
 auth:
