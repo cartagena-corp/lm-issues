@@ -31,6 +31,7 @@ public class IssueDtoRequest implements Serializable {
     private Integer estimatedTime;
 
     private UUID projectId;
+    private UUID sprintId;
 
     @NotNull(message = "Priority is required")
     private Long priority;
