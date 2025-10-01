@@ -26,4 +26,5 @@ public class IssueDTO {
     private LocalDateTime updatedAt;
     private UUID reporterId;
     private UUID assignedId;
+    private UUID organizationId;
 }
