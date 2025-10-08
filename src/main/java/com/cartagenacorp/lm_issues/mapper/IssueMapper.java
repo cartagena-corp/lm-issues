@@ -6,7 +6,7 @@ import com.cartagenacorp.lm_issues.dto.IssueDtoRequest;
 import com.cartagenacorp.lm_issues.dto.IssueDtoResponse;
 import org.mapstruct.*;
 
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE, componentModel = MappingConstants.ComponentModel.SPRING)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE, componentModel = MappingConstants.ComponentModel.SPRING, uses = {DescriptionMapper.class})
 public interface IssueMapper {
     Issue toEntity(IssueDtoRequest issueDtoRequest);
 
@@ -16,7 +16,9 @@ public interface IssueMapper {
 
     @AfterMapping
     default void linkDescriptions(@MappingTarget Issue issue) {
-        issue.getDescriptions().forEach(description -> description.setIssue(issue));
+        if (issue.getDescriptions() != null) {
+            issue.getDescriptions().forEach(description -> description.setIssue(issue));
+        }
     }
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

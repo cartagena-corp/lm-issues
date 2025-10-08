@@ -10,8 +10,15 @@ spring:
       ddl-auto: update
     open-in-view: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 50MB
 server:
   port: 8090
+file:
+  upload-dir: /opt/la-muralla/description-uploads
+  upload-access-url: https://lm-issues.cartagenacorporation.com/description-uploads/
 app:
   cors:
     allowed-origins: https://cartagenacorporation.com,https://www.cartagenacorporation.com

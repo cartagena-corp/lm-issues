@@ -9,9 +9,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +27,17 @@ public class IssueController {
 
     public IssueController(IssueService issueService) {
         this.issueService = issueService;
+    }
+
+    @PostMapping("/{issueId}/description/{descriptionId}/files")
+    @RequiresPermission({"ISSUE_CREATE", "ISSUE_UPDATE"})
+    public ResponseEntity<Void> uploadFilesToDescription(
+            @PathVariable UUID issueId,
+            @PathVariable UUID descriptionId,
+            @RequestPart("files") MultipartFile[] files
+    ) {
+        issueService.addFilesToDescription(issueId, descriptionId, files);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping

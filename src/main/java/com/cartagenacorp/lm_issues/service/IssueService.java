@@ -1,12 +1,16 @@
 package com.cartagenacorp.lm_issues.service;
 
 import com.cartagenacorp.lm_issues.dto.*;
+import com.cartagenacorp.lm_issues.entity.DescriptionFile;
+import com.cartagenacorp.lm_issues.repository.DescriptionRepository;
 import com.cartagenacorp.lm_issues.repository.specifications.IssueSpecifications;
 import com.cartagenacorp.lm_issues.entity.Description;
 import com.cartagenacorp.lm_issues.entity.Issue;
 import com.cartagenacorp.lm_issues.mapper.IssueMapper;
 import com.cartagenacorp.lm_issues.repository.IssueRepository;
 import com.cartagenacorp.lm_issues.util.JwtContextHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -15,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -25,21 +30,46 @@ import java.util.stream.Collectors;
 
 @Service
 public class IssueService {
+
+    private static final Logger logger = LoggerFactory.getLogger(IssueService.class);
+
     private final IssueRepository issueRepository;
+    private final DescriptionRepository descriptionRepository;
     private final IssueMapper issueMapper;
     private final UserExternalService userExternalService;
     private final ProjectExternalService projectExternalService;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final FileStorageService fileStorageService;
 
-    public IssueService(IssueRepository issueRepository, IssueMapper issueMapper, UserExternalService userExternalService,
-                        ProjectExternalService projectExternalService, AuditService auditService, NotificationService notificationService) {
+    public IssueService(IssueRepository issueRepository, DescriptionRepository descriptionRepository, IssueMapper issueMapper, UserExternalService userExternalService,
+                        ProjectExternalService projectExternalService, AuditService auditService, NotificationService notificationService, FileStorageService fileStorageService) {
         this.issueRepository = issueRepository;
+        this.descriptionRepository = descriptionRepository;
         this.issueMapper = issueMapper;
         this.userExternalService = userExternalService;
         this.projectExternalService = projectExternalService;
         this.auditService = auditService;
         this.notificationService = notificationService;
+        this.fileStorageService = fileStorageService;
+    }
+
+    public void addFilesToDescription(UUID issueId, UUID descriptionId, MultipartFile[] files) {
+        if (!issueRepository.existsById(issueId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found");
+        }
+
+        Description description = descriptionRepository.findById(descriptionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Description not found"));
+
+        if (!description.getIssue().getId().equals(issueId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Description does not belong to this issue");
+        }
+
+        if (files != null && files.length > 0) {
+            fileStorageService.saveFiles(description, files);
+            logger.info("Archivos adjuntados a la descripción ID={}", descriptionId);
+        }
     }
 
     @Transactional
@@ -234,27 +264,59 @@ public class IssueService {
 
         if (updatedIssueDTO.getDescriptions() != null) {
             for (DescriptionDtoRequest descriptionDtoRequest : updatedIssueDTO.getDescriptions()) {
+                Description description;
+
                 if (descriptionDtoRequest.getId() != null) {
-                    issue.getDescriptions().stream()
-                            .filter(description -> description.getId().equals(descriptionDtoRequest.getId()))
+                    description = issue.getDescriptions().stream()
+                            .filter(d -> d.getId().equals(descriptionDtoRequest.getId()))
                             .findFirst()
-                            .ifPresent(description -> {
-                                if (!Objects.equals(description.getText(), descriptionDtoRequest.getText()) ||
-                                        !Objects.equals(description.getTitle(), descriptionDtoRequest.getTitle())) {
-                                    description.setTitle(descriptionDtoRequest.getTitle());
-                                    description.setText(descriptionDtoRequest.getText());
-                                    descriptionsChanged.set(true);
-                                }
-                            });
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Description not found"));
+
+                    if (!Objects.equals(description.getText(), descriptionDtoRequest.getText()) ||
+                            !Objects.equals(description.getTitle(), descriptionDtoRequest.getTitle())) {
+                        description.setTitle(descriptionDtoRequest.getTitle());
+                        description.setText(descriptionDtoRequest.getText());
+                        descriptionsChanged.set(true);
+                    }
+
                 } else {
-                    Description newDescription = new Description();
-                    newDescription.setTitle(descriptionDtoRequest.getTitle());
-                    newDescription.setText(descriptionDtoRequest.getText());
-                    newDescription.setIssue(issue);
-                    issue.getDescriptions().add(newDescription);
+                    description = new Description();
+                    description.setTitle(descriptionDtoRequest.getTitle());
+                    description.setText(descriptionDtoRequest.getText());
+                    description.setIssue(issue);
+                    issue.getDescriptions().add(description);
                     descriptionsChanged.set(true);
                 }
+
+                if (descriptionDtoRequest.getAttachments() != null) {
+                    Set<UUID> incomingFileIds = descriptionDtoRequest.getAttachments().stream()
+                            .filter(f -> f.getId() != null)
+                            .map(DescriptionFileDtoRequest::getId)
+                            .collect(Collectors.toSet());
+
+                    Iterator<DescriptionFile> iterator = description.getAttachments().iterator();
+                    while (iterator.hasNext()) {
+                        DescriptionFile existingFile = iterator.next();
+                        if (!incomingFileIds.contains(existingFile.getId())) {
+                            fileStorageService.deleteFile(existingFile.getFileUrl());
+                            iterator.remove();
+                            descriptionsChanged.set(true);
+                        }
+                    }
+
+                    for (DescriptionFileDtoRequest fileDTO : descriptionDtoRequest.getAttachments()) {
+                        if (fileDTO.getId() == null) { // nuevo archivo
+                            DescriptionFile newFile = new DescriptionFile();
+                            newFile.setFileName(fileDTO.getFileName());
+                            newFile.setFileUrl(fileDTO.getFileUrl());
+                            newFile.setDescription(description);
+                            description.getAttachments().add(newFile);
+                            descriptionsChanged.set(true);
+                        }
+                    }
+                }
             }
+
             boolean removed = issue.getDescriptions().removeIf(
                     description -> description.getId() != null && updatedIssueDTO.getDescriptions().stream()
                             .noneMatch(descriptionDtoRequest ->
