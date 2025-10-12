@@ -2,14 +2,15 @@ package com.cartagenacorp.lm_issues.controller;
 
 import com.cartagenacorp.lm_issues.dto.*;
 import com.cartagenacorp.lm_issues.service.IssueService;
+import com.cartagenacorp.lm_issues.util.ConstantUtil;
 import com.cartagenacorp.lm_issues.util.RequiresPermission;
+import com.cartagenacorp.lm_issues.util.ResponseUtil;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -37,14 +38,18 @@ public class IssueController {
             @RequestPart("files") MultipartFile[] files
     ) {
         issueService.addFilesToDescription(issueId, descriptionId, files);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .build();
     }
 
     @PostMapping
     @RequiresPermission({"ISSUE_CREATE"})
-    public ResponseEntity<?> createIssue(@RequestBody @Valid IssueDtoRequest issueDtoRequest) {
+    public ResponseEntity<IssueDtoResponse> createIssue(@RequestBody @Valid IssueDtoRequest issueDtoRequest) {
         IssueDtoResponse createdIssue = issueService.createIssue(issueDtoRequest);
-        return new ResponseEntity<>(createdIssue, HttpStatus.CREATED);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(createdIssue);
     }
 
     @GetMapping("/search")
@@ -83,7 +88,7 @@ public class IssueController {
 
     @GetMapping("/{id}")
     @RequiresPermission({"ISSUE_READ"})
-    public ResponseEntity<?> getIssueById(@PathVariable String id) {
+    public ResponseEntity<IssueDtoResponse> getIssueById(@PathVariable String id) {
         UUID uuid = UUID.fromString(id);
         IssueDtoResponse issue = issueService.getIssueById(uuid);
         return ResponseEntity.ok(issue);
@@ -91,7 +96,7 @@ public class IssueController {
 
     @PutMapping("/{id}")
     @RequiresPermission({"ISSUE_UPDATE"})
-    public ResponseEntity<?> updateIssue(@PathVariable String id, @RequestBody @Valid IssueDtoRequest issueDtoRequest) {
+    public ResponseEntity<IssueDtoResponse> updateIssue(@PathVariable String id, @RequestBody @Valid IssueDtoRequest issueDtoRequest) {
         UUID uuid = UUID.fromString(id);
         IssueDtoResponse updatedIssue = issueService.updateIssue(uuid, issueDtoRequest);
         return ResponseEntity.ok(updatedIssue);
@@ -99,22 +104,26 @@ public class IssueController {
 
     @DeleteMapping("/{id}")
     @RequiresPermission({"ISSUE_DELETE"})
-    public ResponseEntity<?> deleteIssue(@PathVariable String id) {
+    public ResponseEntity<NotificationResponse> deleteIssue(@PathVariable String id) {
         UUID uuid = UUID.fromString(id);
         issueService.deleteIssue(uuid);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ResponseUtil.success(ConstantUtil.Success.RESOURCE_DELETED_SUCCESSFULLY));
     }
 
     @DeleteMapping("/batch")
     @RequiresPermission({"ISSUE_DELETE"})
-    public ResponseEntity<Void> deleteIssues(@RequestBody List<UUID> ids) {
+    public ResponseEntity<NotificationResponse> deleteIssues(@RequestBody List<UUID> ids) {
         issueService.deleteIssues(ids);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ResponseUtil.success(ConstantUtil.Success.RESOURCES_DELETED_SUCCESSFULLY));
     }
 
     @PatchMapping("/assignUser/{id}")
     @RequiresPermission({"ISSUE_UPDATE"})
-    public ResponseEntity<?> assignUsersToIssue(@PathVariable String id, @RequestBody(required = false) UUID userId) {
+    public ResponseEntity<IssueDtoResponse> assignUsersToIssue(@PathVariable String id, @RequestBody(required = false) UUID userId) {
         UUID uuid = UUID.fromString(id);
         IssueDtoResponse updatedIssue = issueService.assignUserToIssue(uuid, userId);
         return ResponseEntity.ok(updatedIssue);
@@ -136,14 +145,18 @@ public class IssueController {
     @RequiresPermission({"COMMENT_CREATE"})
     public ResponseEntity<Boolean> issueExists(@PathVariable String id){
         UUID uuid = UUID.fromString(id);
-        return ResponseEntity.status(HttpStatus.OK).body(issueService.issueExists(uuid));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(issueService.issueExists(uuid));
     }
 
     @PostMapping("/batch")  //se usa desde lm-integrations (uso interno) o desde frontend para crear varias tareas
     @RequiresPermission({"ISSUE_CREATE" , "IMPORT_PROJECT"})
     public ResponseEntity<?> createIssuesBatch(@RequestBody List<IssueDTO> issues) {
         List<IssueDTO> result = issueService.createIssuesBatch(issues);
-        return new ResponseEntity<>(result, HttpStatus.CREATED);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(result);
     }
 
     @PostMapping("/assign")  //se usa desde lm-sprints (uso interno)

@@ -32,7 +32,7 @@ public class ProjectExternalService {
         if (projectId == null) {
             return false;
         }
-        logger.debug("Validando la existencia del proyecto con ID: {}", projectId);
+        logger.debug("[ProjectExternalService] [validateProjectExists] Validando la existencia del proyecto con ID={}", projectId);
         try {
             String url = projectServiceUrl + "/validate/" + projectId;
 
@@ -47,22 +47,22 @@ public class ProjectExternalService {
                     Boolean.class
             );
 
-            logger.info("Resultado de la validación de existencia del proyecto con ID {}: {}", projectId, response);
+            logger.info("[ProjectExternalService] [validateProjectExists] Resultado de la validación de existencia del proyecto con ID {}: {}", projectId, response);
             return Boolean.TRUE.equals(response.getBody());
         } catch (HttpClientErrorException.Unauthorized ex) {
-            logger.warn("Token no autorizado para validar la existencia del proyecto: {}", ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectExists] Token no autorizado para validar la existencia del proyecto: {}", ex.getMessage());
         } catch (HttpClientErrorException.Forbidden ex) {
-            logger.warn("No tiene permisos para  validar la existencia del proyecto: {}", ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectExists] No tiene permisos para  validar la existencia del proyecto: {}", ex.getMessage());
         } catch (ResourceAccessException ex) {
-            logger.warn("El servicio externo no esta disponible: {}",ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectExists] El servicio externo no esta disponible: {}",ex.getMessage());
         }  catch (Exception ex) {
-            logger.error("Error al validar la existencia del proyecto: {}", ex.getMessage(), ex);
+            logger.error("[ProjectExternalService] [validateProjectExists] Error al validar la existencia del proyecto: {}", ex.getMessage(), ex);
         }
         return false;
     }
 
     public boolean validateProjectParticipant(UUID projectId, String token) {
-        logger.debug("Validando participación en el proyecto con ID: {}", projectId);
+        logger.debug("[ProjectExternalService] [validateProjectParticipant] Validando participación en el proyecto con ID={}", projectId);
         try {
             String url = projectServiceUrl + "/validateParticipant/" + projectId;
 
@@ -77,18 +77,18 @@ public class ProjectExternalService {
                     Boolean.class
             );
 
-            logger.info("Resultado validación de participación en proyecto {}: {}", projectId, response);
+            logger.info("[ProjectExternalService] [validateProjectParticipant] Resultado validación de participación en proyecto {}: {}", projectId, response);
             return Boolean.TRUE.equals(response.getBody());
         } catch (HttpClientErrorException.NotFound ex) {
-            logger.warn("Proyecto no encontrado: {}", ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectParticipant] Proyecto no encontrado: {}", ex.getMessage());
         } catch (HttpClientErrorException.Unauthorized ex) {
-            logger.warn("Token no autorizado para validar participación en proyecto: {}", ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectParticipant] Token no autorizado para validar participación en proyecto: {}", ex.getMessage());
         } catch (HttpClientErrorException.Forbidden ex) {
-            logger.warn("No tiene permisos para validar participación en proyecto: {}", ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectParticipant] No tiene permisos para validar participación en proyecto: {}", ex.getMessage());
         } catch (ResourceAccessException ex) {
-            logger.warn("El servicio externo no está disponible: {}", ex.getMessage());
+            logger.warn("[ProjectExternalService] [validateProjectParticipant] El servicio externo no está disponible: {}", ex.getMessage());
         } catch (Exception ex) {
-            logger.error("Error al validar participación en proyecto: {}", ex.getMessage(), ex);
+            logger.error("[ProjectExternalService] [validateProjectParticipant] Error al validar participación en proyecto: {}", ex.getMessage(), ex);
         }
         return false;
     }

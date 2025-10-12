@@ -78,7 +78,7 @@ public class FileStorageService {
             return fileName;
         } catch (IOException e) {
             logger.error("Error al guardar archivo: {}", file.getOriginalFilename(), e);
-            throw new FileStorageException("rror guardando el archivo " + file.getOriginalFilename(), e);
+            throw new FileStorageException("Error guardando el archivo " + file.getOriginalFilename(), e);
         }
     }
 

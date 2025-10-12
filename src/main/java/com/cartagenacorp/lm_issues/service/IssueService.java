@@ -2,6 +2,7 @@ package com.cartagenacorp.lm_issues.service;
 
 import com.cartagenacorp.lm_issues.dto.*;
 import com.cartagenacorp.lm_issues.entity.DescriptionFile;
+import com.cartagenacorp.lm_issues.exceptions.BaseException;
 import com.cartagenacorp.lm_issues.repository.DescriptionRepository;
 import com.cartagenacorp.lm_issues.repository.specifications.IssueSpecifications;
 import com.cartagenacorp.lm_issues.entity.Description;
@@ -38,32 +39,32 @@ public class IssueService {
     private final IssueMapper issueMapper;
     private final UserExternalService userExternalService;
     private final ProjectExternalService projectExternalService;
-    private final AuditService auditService;
-    private final NotificationService notificationService;
+    private final AuditExternalService auditExternalService;
+    private final NotificationExternalService notificationExternalService;
     private final FileStorageService fileStorageService;
 
     public IssueService(IssueRepository issueRepository, DescriptionRepository descriptionRepository, IssueMapper issueMapper, UserExternalService userExternalService,
-                        ProjectExternalService projectExternalService, AuditService auditService, NotificationService notificationService, FileStorageService fileStorageService) {
+                        ProjectExternalService projectExternalService, AuditExternalService auditExternalService, NotificationExternalService notificationExternalService, FileStorageService fileStorageService) {
         this.issueRepository = issueRepository;
         this.descriptionRepository = descriptionRepository;
         this.issueMapper = issueMapper;
         this.userExternalService = userExternalService;
         this.projectExternalService = projectExternalService;
-        this.auditService = auditService;
-        this.notificationService = notificationService;
+        this.auditExternalService = auditExternalService;
+        this.notificationExternalService = notificationExternalService;
         this.fileStorageService = fileStorageService;
     }
 
     public void addFilesToDescription(UUID issueId, UUID descriptionId, MultipartFile[] files) {
         if (!issueRepository.existsById(issueId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found");
+            throw new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value());
         }
 
         Description description = descriptionRepository.findById(descriptionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Description not found"));
+                .orElseThrow(() -> new BaseException("Descripción no encontrada", HttpStatus.NOT_FOUND.value()));
 
         if (!description.getIssue().getId().equals(issueId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Description does not belong to this issue");
+            throw new BaseException("La descripción no pertenece a esta Issue", HttpStatus.BAD_REQUEST.value());
         }
 
         if (files != null && files.length > 0) {
@@ -75,7 +76,7 @@ public class IssueService {
     @Transactional
     public IssueDtoResponse createIssue(IssueDtoRequest issueDtoRequest) {
         if (issueDtoRequest == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
+            throw new BaseException("La Issue no puede ser nula", HttpStatus.BAD_REQUEST.value());
         }
 
         UUID userId = JwtContextHolder.getUserId();
@@ -83,16 +84,16 @@ public class IssueService {
         UUID organizationId = JwtContextHolder.getOrganizationId();
 
         if (!projectExternalService.validateProjectExists(issueDtoRequest.getProjectId(), token)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The project ID provided is not valid");
+            throw new BaseException("El ID del proyecto proporcionado no es válido", HttpStatus.NOT_FOUND.value());
         }
 
         if (!projectExternalService.validateProjectParticipant(issueDtoRequest.getProjectId(), token)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+            throw new BaseException("No eres participante en este proyecto", HttpStatus.FORBIDDEN.value());
         }
 
         if (issueDtoRequest.getAssignedId() != null &&
                 !userExternalService.userExists(issueDtoRequest.getAssignedId(), token)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Assigned user not found");
+            throw new BaseException("Usuario asignado no encontrado", HttpStatus.NOT_FOUND.value());
         }
 
         Issue issue = issueMapper.toEntity(issueDtoRequest);
@@ -103,7 +104,7 @@ public class IssueService {
         Issue savedIssue = issueRepository.save(issue);
 
         try {
-            auditService.logChange(savedIssue.getId(), userId, "CREATE", "Issue created", savedIssue.getProjectId());
+            auditExternalService.logChange(savedIssue.getId(), userId, "CREATE", "Issue created", savedIssue.getProjectId());
         }catch (Exception ignored){}
 
         if (savedIssue.getAssignedId() != null) {
@@ -111,7 +112,7 @@ public class IssueService {
                 @Override
                 public void afterCommit() {
                     try {
-                        notificationService.sendNotification(
+                        notificationExternalService.sendNotification(
                                 savedIssue.getAssignedId(),
                                 "A new issue has been created to which you are assigned: " + savedIssue.getTitle(),
                                 "ISSUE_ASSIGNED",
@@ -157,7 +158,7 @@ public class IssueService {
                                                         Pageable pageable) {
 
         if (!projectExternalService.validateProjectParticipant(projectId, JwtContextHolder.getToken())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+            throw new BaseException("No eres participante en este proyecto", HttpStatus.FORBIDDEN.value());
         }
 
         Specification<Issue> spec = Specification
@@ -194,10 +195,10 @@ public class IssueService {
     @Transactional(readOnly = true)
     public IssueDtoResponse getIssueById(UUID id) {
         Issue issue = issueRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+                .orElseThrow(() -> new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value()));
 
         if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+            throw new BaseException("No eres participante en este proyecto", HttpStatus.FORBIDDEN.value());
         }
 
         return getIssueDtoResponse(issue);
@@ -206,24 +207,24 @@ public class IssueService {
     @Transactional
     public IssueDtoResponse updateIssue(UUID id, IssueDtoRequest updatedIssueDTO) {
         if (updatedIssueDTO == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The issue cannot be null");
+            throw new BaseException("La Issue no puede ser nula", HttpStatus.BAD_REQUEST.value());
         }
 
         UUID userId = JwtContextHolder.getUserId();
 
         Issue issue = issueRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+                .orElseThrow(() -> new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value()));
 
         if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+            throw new BaseException("No eres participante en este proyecto", HttpStatus.FORBIDDEN.value());
         }
 
         if(updatedIssueDTO.getProjectId() != null && !updatedIssueDTO.getProjectId().equals(issue.getProjectId())){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The project id cannot change" );
+            throw new BaseException("El ID del proyecto no puede cambiar", HttpStatus.BAD_REQUEST.value());
         }
 
         if(updatedIssueDTO.getAssignedId() != null ){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The assigned ID is not accepted" );
+            throw new BaseException("El campo de usuario asignado no es aceptado", HttpStatus.BAD_REQUEST.value());
         }
 
         List<String> changedFields = new ArrayList<>();
@@ -338,12 +339,12 @@ public class IssueService {
         if (!changedFields.isEmpty()) {
             String auditDesc = "Updated fields: " + String.join(", ", changedFields);
             try {
-                auditService.logChange(id, userId, "UPDATE", auditDesc, savedIssue.getProjectId());
+                auditExternalService.logChange(id, userId, "UPDATE", auditDesc, savedIssue.getProjectId());
             } catch (Exception ignored) {}
 
             if (savedIssue.getAssignedId() != null) {
                 try {
-                    notificationService.sendNotification(
+                    notificationExternalService.sendNotification(
                             savedIssue.getAssignedId(),
                             "An issue you are assigned to has been updated: " + savedIssue.getTitle(),
                             "ISSUE_UPDATED",
@@ -364,10 +365,10 @@ public class IssueService {
     @Transactional
     public void deleteIssue(UUID id) {
         Issue issue = issueRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+                .orElseThrow(() -> new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value()));
 
         if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+            throw new BaseException("No eres participante en este proyecto", HttpStatus.FORBIDDEN.value());
         }
 
         issueRepository.delete(issue);
@@ -394,10 +395,10 @@ public class IssueService {
         String token = JwtContextHolder.getToken();
 
         Issue issue = issueRepository.findById(issueId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+                .orElseThrow(() -> new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value()));
 
         if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a participant of this project");
+            throw new BaseException("No eres participante en este proyecto", HttpStatus.FORBIDDEN.value());
         }
 
         String auditDescription;
@@ -406,7 +407,7 @@ public class IssueService {
             auditDescription = "User unassigned to issue";
         } else {
             if (!userExternalService.userExists(assignedId, token)) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+                throw new BaseException("Usuario asignado no encontrado", HttpStatus.NOT_FOUND.value());
             }
             issue.setAssignedId(assignedId);
             auditDescription = "User assigned to issue";
@@ -415,12 +416,12 @@ public class IssueService {
         Issue savedIssue = issueRepository.save(issue);
 
         try {
-            auditService.logChange(savedIssue.getId(), userId, "ASSIGN", auditDescription, savedIssue.getProjectId());
+            auditExternalService.logChange(savedIssue.getId(), userId, "ASSIGN", auditDescription, savedIssue.getProjectId());
         } catch (Exception ignored){}
 
         if (savedIssue.getAssignedId() != null) {
             try {
-                notificationService.sendNotification(
+                notificationExternalService.sendNotification(
                         savedIssue.getAssignedId(),
                         "You have been assigned to an issue: " + savedIssue.getTitle(),
                         "ISSUE_ASSIGNED",
@@ -476,14 +477,14 @@ public class IssueService {
         List<Issue> issues = issueRepository.findAllById(issueIds);
 
         if (issues.size() != issueIds.size()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Some issues were not found");
+            throw new BaseException("Algunas Issues no fueron encontradas", HttpStatus.NOT_FOUND.value());
         }
 
         for (Issue issue : issues) {
             issue.setSprintId(sprintId);
             try {
                 UUID userId = JwtContextHolder.getUserId();
-                auditService.logChange(issue.getId(), userId, "SPRINT", "Sprint assigned: " + sprintId, issue.getProjectId());
+                auditExternalService.logChange(issue.getId(), userId, "SPRINT", "Sprint assigned: " + sprintId, issue.getProjectId());
             } catch (Exception ignored){}
         }
         issueRepository.saveAll(issues);
@@ -494,14 +495,14 @@ public class IssueService {
         List<Issue> issues = issueRepository.findAllById(issueIds);
 
         if (issues.size() != issueIds.size()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Some issues were not found");
+            throw new BaseException("Algunas Issues no fueron encontradas", HttpStatus.NOT_FOUND.value());
         }
 
         for (Issue issue : issues) {
             issue.setSprintId(null);
             try {
                 UUID userId = JwtContextHolder.getUserId();
-                auditService.logChange(issue.getId(), userId, "SPRINT", "Sprint unassigned", issue.getProjectId());
+                auditExternalService.logChange(issue.getId(), userId, "SPRINT", "Sprint unassigned", issue.getProjectId());
             } catch (Exception ignored){}
         }
         issueRepository.saveAll(issues);

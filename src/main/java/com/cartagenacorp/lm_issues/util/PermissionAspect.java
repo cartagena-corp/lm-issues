@@ -1,5 +1,6 @@
 package com.cartagenacorp.lm_issues.util;
 
+import com.cartagenacorp.lm_issues.exceptions.BaseException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -28,13 +29,13 @@ public class PermissionAspect {
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header");
+            throw new BaseException("Authorization header faltante o no válido", HttpStatus.UNAUTHORIZED.value());
         }
 
         String token = authHeader.substring(7);
 
         if (!jwtTokenUtil.validateToken(token)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+            throw new BaseException("Token inválido o caducado", HttpStatus.UNAUTHORIZED.value());
         }
 
         List<String> permissions = jwtTokenUtil.getPermissionsFromToken(token);
@@ -50,7 +51,7 @@ public class PermissionAspect {
                     .anyMatch(permissions::contains);
 
             if (!hasPermission) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Insufficient permissions");
+                throw new BaseException("Permisos insuficientes", HttpStatus.FORBIDDEN.value());
             }
 
             return joinPoint.proceed();
