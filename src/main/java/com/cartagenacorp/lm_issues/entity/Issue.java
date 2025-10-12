@@ -1,5 +1,7 @@
 package com.cartagenacorp.lm_issues.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -73,4 +75,19 @@ public class Issue {
 
     @Column(name = "organization_id")
     private UUID organizationId;
+
+    @ManyToOne
+    @JoinColumn(name = "parent_id")
+    @JsonBackReference
+    private Issue parent;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Issue> subtasks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "source", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IssueRelation> relatedIssues = new ArrayList<>();
+
+    @OneToMany(mappedBy = "target", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IssueRelation> relatedTo = new ArrayList<>();
 }

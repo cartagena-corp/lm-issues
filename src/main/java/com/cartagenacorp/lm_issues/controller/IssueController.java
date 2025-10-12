@@ -62,6 +62,7 @@ public class IssueController {
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) List<String> assignedIds,
+            @RequestParam(required = false) Boolean isParent,
             @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
@@ -81,7 +82,7 @@ public class IssueController {
         Pageable pageable = PageRequest.of(page, size, sort);
 
         PageResponseDTO<IssueDtoResponse> results = issueService.findIssues(
-                keyword, projectIdUuid, sprintIdUuid, statusParsed, priorityParsed, typeParsed, assignedIdUuids, pageable);
+                keyword, projectIdUuid, sprintIdUuid, statusParsed, priorityParsed, typeParsed, assignedIdUuids, isParent, pageable);
 
         return ResponseEntity.ok(results);
     }

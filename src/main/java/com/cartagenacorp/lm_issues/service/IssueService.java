@@ -208,7 +208,7 @@ public class IssueService {
     @Transactional(readOnly = true)
     public PageResponseDTO<IssueDtoResponse> findIssues(String keyword, UUID projectId, UUID sprintId, Long status,
                                                         Long priority, Long type, List<UUID> assignedIds,
-                                                        Pageable pageable) {
+                                                        Boolean isParent, Pageable pageable) {
 
         logger.info("[IssueService] [findIssues] Iniciando búsqueda de Issues con filtros. Proyecto ID={}, Sprint ID={}, Estado ID={}, Prioridad ID={}, Tipo ID={}",
                 projectId, sprintId, status, priority, type);
@@ -226,7 +226,8 @@ public class IssueService {
                 .and(IssueSpecifications.hasStatus(status))
                 .and(IssueSpecifications.hasPriority(priority))
                 .and(IssueSpecifications.hasType(type))
-                .and(IssueSpecifications.hasAssignedIn(assignedIds));
+                .and(IssueSpecifications.hasAssignedIn(assignedIds))
+                .and(IssueSpecifications.hasParentCondition(isParent));
 
         Page<Issue> issues;
         try {
