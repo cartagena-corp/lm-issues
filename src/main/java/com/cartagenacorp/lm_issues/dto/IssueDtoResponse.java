@@ -35,4 +35,5 @@ public class IssueDtoResponse implements Serializable {
     UserBasicDataDto reporterId;
     UserBasicDataDto assignedId;
     UUID organizationId;
+    ParentInfoDto parent;
 }
