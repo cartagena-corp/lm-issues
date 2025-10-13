@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -126,7 +125,7 @@ public class IssueService {
         Issue savedIssue = issueRepository.save(issue);
 
         try {
-            auditExternalService.logChange(savedIssue.getId(), userId, "CREATE", "Issue created", savedIssue.getProjectId());
+            auditExternalService.logChange(savedIssue.getId(), savedIssue.getTitle(), userId, "CREATE", "Nueva Issue", savedIssue.getProjectId(), savedIssue, null, token);
             logger.info("[IssueService] [createIssue] Registro de auditoría enviado correctamente para la Issue con ID={}", savedIssue.getId());
         } catch (Exception ex){
             logger.error("[IssueService] [createIssue] Error al registrar auditoría para la Issue con ID={}: {}", savedIssue.getId(), ex.getMessage());
@@ -149,7 +148,6 @@ public class IssueService {
                                 savedIssue.getProjectId(),
                                 savedIssue.getId()
                         );
-                        logger.info("[IssueService] [createIssue] Notificación enviada al usuario asignado con ID={}", savedIssue.getAssignedId());
                     } catch (Exception ex) {
                         logger.error("[IssueService] [createIssue] Error al enviar notificación al usuario asignado: {}", ex.getMessage());
                     }
@@ -297,6 +295,7 @@ public class IssueService {
             throw new BaseException("La Issue no puede ser nula", HttpStatus.BAD_REQUEST.value());
         }
 
+        String token = JwtContextHolder.getToken();
         UUID userId = JwtContextHolder.getUserId();
         UUID organizationId = JwtContextHolder.getOrganizationId();
 
@@ -307,6 +306,7 @@ public class IssueService {
                     logger.warn("[IssueService] [updateIssue] Issue no encontrada con ID={}", id);
                     return new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value());
                 });
+        Issue originalIssue = new Issue(issue);
 
         if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
             logger.warn("[IssueService] [updateIssue] El usuario no es participante del proyecto con ID={}", issue.getProjectId());
@@ -373,7 +373,7 @@ public class IssueService {
                             .findFirst()
                             .orElseThrow(() -> {
                                 logger.warn("[IssueService] [updateIssue] Descripción con ID={} no encontrada", descriptionDtoRequest.getId());
-                                return new ResponseStatusException(HttpStatus.NOT_FOUND, "Description not found");
+                                return new BaseException("Descripcion no encontrada", HttpStatus.NOT_FOUND.value());
                             });
 
                     if (!Objects.equals(description.getText(), descriptionDtoRequest.getText()) ||
@@ -449,7 +449,7 @@ public class IssueService {
             logger.info("[IssueService] [updateIssue] Campos modificados: {}", auditDesc);
 
             try {
-                auditExternalService.logChange(id, userId, "UPDATE", auditDesc, savedIssue.getProjectId());
+                auditExternalService.logChange(savedIssue.getId(), savedIssue.getTitle(), userId, "UPDATE", "Issue editada -> " + auditDesc, savedIssue.getProjectId(), originalIssue, savedIssue, token);
                 logger.info("[IssueService] [updateIssue] Registro de auditoría enviado correctamente para la Issue con ID={}", savedIssue.getId());
             } catch (Exception e) {
                 logger.error("[IssueService] [updateIssue] Error al registrar auditoría: {}", e.getMessage());
@@ -483,6 +483,7 @@ public class IssueService {
     public void deleteIssue(UUID id) {
         logger.info("[IssueService] [deleteIssue] Iniciando eliminación de issue con ID={}", id);
 
+        String token = JwtContextHolder.getToken();
         UUID userId = JwtContextHolder.getUserId();
         UUID organizationId = JwtContextHolder.getOrganizationId();
 
@@ -503,7 +504,7 @@ public class IssueService {
         logger.info("[IssueService] [deleteIssue] Issue con ID={} eliminada correctamente", id);
 
         try {
-            auditExternalService.logChange(id, userId, "DELETE", "Issue eliminada", issue.getProjectId());
+            auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "DELETE", "Issue eliminada", issue.getProjectId(), issue, null, token);
             logger.info("[IssueService] [deleteIssue] Registro de auditoría enviado correctamente para la Issue con ID={}", id);
         } catch (Exception e) {
             logger.error("[IssueService] [deleteIssue] Error al registrar auditoría: {}", e.getMessage());
@@ -514,13 +515,13 @@ public class IssueService {
 
     @Transactional
     public void deleteIssues(List<UUID> ids) {
-        logger.info("[IssueService] [deleteIssues] Iniciando eliminación masiva de issues. Cantidad de IDs recibidos={}", (ids != null ? ids.size() : 0));
-
         if (ids == null || ids.isEmpty()) {
             logger.warn("[IssueService] [deleteIssues] La lista de IDs está vacía o es nula.");
             throw new BaseException("La lista de IDs no puede estar vacía", HttpStatus.BAD_REQUEST.value());
         }
+        logger.info("[IssueService] [deleteIssues] Iniciando eliminación masiva de issues. Cantidad de IDs recibidos={}", (ids != null ? ids.size() : 0));
 
+        String token = JwtContextHolder.getToken();
         UUID userId = JwtContextHolder.getUserId();
         UUID organizationId = JwtContextHolder.getOrganizationId();
 
@@ -533,9 +534,13 @@ public class IssueService {
             throw new BaseException("Algunas de las Issues que se intentan eliminar no existen", HttpStatus.NOT_FOUND.value());
         }
 
-        for (Issue issue : issues) {
-            if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), JwtContextHolder.getToken())) {
-                logger.warn("[IssueService] [deleteIssues] El usuario no es participante del proyecto con ID={}", issue.getProjectId());
+        Set<UUID> projectIds = issues.stream()
+                .map(Issue::getProjectId)
+                .collect(Collectors.toSet());
+
+        for (UUID projectId : projectIds) {
+            if (!projectExternalService.validateProjectParticipant(projectId, token)) {
+                logger.warn("[IssueService] [deleteIssues] El usuario no es participante del proyecto con ID={}", projectId);
                 throw new BaseException("No eres participante en uno o más proyectos de las issues seleccionadas", HttpStatus.FORBIDDEN.value());
             }
         }
@@ -545,9 +550,9 @@ public class IssueService {
         logger.info("[IssueService] [deleteIssues] Issues eliminadas correctamente.");
 
         try {
-            for (UUID id : ids) {
-                auditExternalService.logChange(id, userId, "DELETE", "Issue eliminada en eliminación masiva", null);
-                logger.debug("[IssueService] [deleteIssues] Registro de auditoría enviado correctamente para la Issue con ID={}", id);
+            for (Issue issue : issues) {
+                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "DELETE", "Issue eliminada en eliminación masiva", issue.getProjectId(), issue, null, token);
+                logger.debug("[IssueService] [deleteIssues] Registro de auditoría enviado correctamente para la Issue con ID={}", issue.getId());
             }
         } catch (Exception e) {
             logger.error("[IssueService] [deleteIssues] Error al registrar auditoría: {}", e.getMessage());
@@ -568,6 +573,7 @@ public class IssueService {
                     logger.warn("[IssueService] [assignUserToIssue] Issue con ID={} no encontrada", issueId);
                     return new BaseException("Issue no encontrada", HttpStatus.NOT_FOUND.value());
                 });
+        Issue originalIssue = new Issue(issue);
 
         if (!projectExternalService.validateProjectParticipant(issue.getProjectId(), token)) {
             logger.warn("[IssueService] [deleteIssue] El usuario no es participante del proyecto con ID={}", issue.getProjectId());
@@ -594,7 +600,7 @@ public class IssueService {
         logger.debug("[IssueService] [assignUserToIssue] Issue con ID={} actualizada y guardada correctamente en base de datos", savedIssue.getId());
 
         try {
-            auditExternalService.logChange(savedIssue.getId(), userId, "ASSIGN", auditDescription, savedIssue.getProjectId());
+            auditExternalService.logChange(savedIssue.getId(), savedIssue.getTitle(), userId, "ASSIGN", auditDescription, savedIssue.getProjectId(), originalIssue, savedIssue, token);
             logger.info("[IssueService] [assignUserToIssue] Registro de auditoría enviado correctamente para la Issue con ID={}", savedIssue.getId());
         } catch (Exception e) {
             logger.error("[IssueService] [assignUserToIssue] Error al registrar auditoría: {}", e.getMessage());
@@ -662,6 +668,9 @@ public class IssueService {
     public void assignIssuesToSprint(List<UUID> issueIds, UUID sprintId) {
         logger.info("[IssueService] [assignIssuesToSprint] Iniciando asignación de {} issues al sprint con ID: {}", issueIds.size(), sprintId);
 
+        String token = JwtContextHolder.getToken();
+        UUID userId = JwtContextHolder.getUserId();
+
         List<Issue> issues = issueRepository.findAllById(issueIds);
 
         if (issues.size() != issueIds.size()) {
@@ -670,23 +679,29 @@ public class IssueService {
         }
 
         for (Issue issue : issues) {
-            logger.debug("[IssueService] [assignIssuesToSprint] Asignando issue {} al sprint {}", issue.getId(), sprintId);
             issue.setSprintId(sprintId);
+        }
+
+        issueRepository.saveAll(issues);
+        logger.info("[IssueService] [assignIssuesToSprint] Issues guardadas exitosamente.");
+
+        for (Issue issue : issues) {
             try {
-                UUID userId = JwtContextHolder.getUserId();
-                auditExternalService.logChange(issue.getId(), userId, "SPRINT", "Sprint asignado: " + sprintId, issue.getProjectId());
+                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "SPRINT_ASSIGN", "Sprint asignado: " + sprintId, issue.getProjectId(), null, issue, token);
                 logger.debug("[IssueService] [assignIssuesToSprint] Registro de auditoría enviado correctamente para la Issue con ID={}", issue.getId());
             } catch (Exception ex) {
                 logger.error("[IssueService] [assignIssuesToSprint] Error al registrar auditoría: {}", ex.getMessage());
             }
         }
-        issueRepository.saveAll(issues);
         logger.info("[IssueService] [assignIssuesToSprint] Asignación de issues al Sprint con ID={} completada exitosamente", sprintId);
     }
 
     @Transactional
     public void removeIssuesFromSprint(List<UUID> issueIds) {
         logger.info("[IssueService] [removeIssuesFromSprint] Iniciando eliminación de {} issues del sprint", issueIds.size());
+
+        String token = JwtContextHolder.getToken();
+        UUID userId = JwtContextHolder.getUserId();
 
         List<Issue> issues = issueRepository.findAllById(issueIds);
 
@@ -696,17 +711,21 @@ public class IssueService {
         }
 
         for (Issue issue : issues) {
-            logger.debug("[IssueService] [removeIssuesFromSprint] Eliminando el sprint de la Issue con ID={}", issue.getId());
             issue.setSprintId(null);
+        }
+
+        issueRepository.saveAll(issues);
+        logger.info("[IssueService] [removeIssuesFromSprint] Issues actualizadas correctamente.");
+
+        for (Issue issue : issues) {
+            logger.debug("[IssueService] [removeIssuesFromSprint] Eliminando el sprint de la Issue con ID={}", issue.getId());
             try {
-                UUID userId = JwtContextHolder.getUserId();
-                auditExternalService.logChange(issue.getId(), userId, "SPRINT", "Sprint eliminado", issue.getProjectId());
+                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "SPRINT_REMOVE", "Sprint removido de la issue", issue.getProjectId(), null, issue, token);
                 logger.debug("[IssueService] [removeIssuesFromSprint] Registro de auditoría enviado correctamente para la Issue con ID={}", issue.getId());
             } catch (Exception ex) {
                 logger.error("[IssueService] [removeIssuesFromSprint] Error al registrar auditoría: {}", ex.getMessage());
             }
         }
-        issueRepository.saveAll(issues);
         logger.info("[IssueService] [removeIssuesFromSprint] Eliminación de issues del sprint completada exitosamente");
     }
 }
