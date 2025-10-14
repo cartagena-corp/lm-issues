@@ -640,9 +640,8 @@ public class IssueService {
                 new UserBasicDataDto(issue.getAssignedId(), null, null, null, null, null)));
 
         if (issue.getParent() != null) {
-            issueRepository.findById(issue.getId()).ifPresent(parent -> {
-                issueDtoResponse.setParent(new ParentInfoDto(parent.getId(), parent.getTitle()));
-            });
+            Issue parent = issue.getParent();
+            issueDtoResponse.setParent(new ParentInfoDto(parent.getId(), parent.getTitle()));
         }
 
         return issueDtoResponse;
