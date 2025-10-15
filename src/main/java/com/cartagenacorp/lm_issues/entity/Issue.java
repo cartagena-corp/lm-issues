@@ -1,5 +1,7 @@
 package com.cartagenacorp.lm_issues.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "issue")
@@ -73,4 +76,42 @@ public class Issue {
 
     @Column(name = "organization_id")
     private UUID organizationId;
+
+    @ManyToOne
+    @JoinColumn(name = "parent_id")
+    @JsonBackReference
+    private Issue parent;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Issue> subtasks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "source", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IssueRelation> relatedIssues = new ArrayList<>();
+
+    @OneToMany(mappedBy = "target", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IssueRelation> relatedTo = new ArrayList<>();
+
+    public Issue(Issue other) {
+        this.id = other.id;
+        this.title = other.title;
+        this.estimatedTime = other.estimatedTime;
+        this.projectId = other.projectId;
+        this.sprintId = other.sprintId;
+        this.priority = other.priority;
+        this.status = other.status;
+        this.type = other.type;
+        this.createdAt = other.createdAt;
+        this.updatedAt = other.updatedAt;
+        this.reporterId = other.reporterId;
+        this.assignedId = other.assignedId;
+        this.startDate = other.startDate;
+        this.endDate = other.endDate;
+        this.realDate = other.realDate;
+        if(other.descriptions != null) {
+            this.descriptions = other.descriptions.stream()
+                    .map(Description::new)
+                    .collect(Collectors.toList());
+        }
+    }
 }

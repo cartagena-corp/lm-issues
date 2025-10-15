@@ -30,7 +30,7 @@ public class UserExternalService {
     }
 
     public List<UserBasicDataDto> getUsersData(String token, List<String> ids) {
-        logger.debug("Obteniendo información de los usuarios con IDs: {}", ids);
+        logger.debug("[UserExternalService] [getUsersData] Obteniendo información de los usuarios con IDs: {}", ids);
         try {
             String url = authServiceUrl + "/users/batch";
 
@@ -45,24 +45,24 @@ public class UserExternalService {
                     entity,
                     new ParameterizedTypeReference<List<UserBasicDataDto>>() {}
             );
-            logger.info("Resultado de la obtención de información de los usuarios con IDs {} : {}", ids, response);
+            logger.info("[UserExternalService] [getUsersData] Resultado de la obtención de información de los usuarios con IDs {} : {}", ids, response);
 
             List<UserBasicDataDto> result = response.getBody();
             return result != null ? result : Collections.emptyList();
         } catch (HttpClientErrorException.Unauthorized ex) {
-            logger.warn("Token no autorizado para obtener la información de los usuarios con IDs {}: {}", ids, ex.getMessage());
+            logger.warn("[UserExternalService] [getUsersData] Token no autorizado para obtener la información de los usuarios con IDs {}: {}", ids, ex.getMessage());
         } catch (HttpClientErrorException.Forbidden ex) {
-            logger.warn("No tiene permisos para  obtener la información de los usuarios con IDs {}: {}", ids, ex.getMessage());
+            logger.warn("[UserExternalService] [getUsersData] No tiene permisos para  obtener la información de los usuarios con IDs {}: {}", ids, ex.getMessage());
         } catch (ResourceAccessException ex) {
-            logger.warn("El servicio externo no esta disponible: {}",ex.getMessage());
+            logger.warn("[UserExternalService] [getUsersData] El servicio externo no esta disponible: {}",ex.getMessage());
         }  catch (Exception ex) {
-            logger.error("Error al obtener información de los usuarios con IDs {}: {}", ids, ex.getMessage(), ex);
+            logger.error("[UserExternalService] [getUsersData] Error al obtener información de los usuarios con IDs {}: {}", ids, ex.getMessage(), ex);
         }
         return Collections.emptyList();
     }
 
     public boolean userExists(UUID userId, String token) {
-        logger.debug("Validando la existencia del usuario con ID: {}", userId);
+        logger.debug("[UserExternalService] [userExists] Validando la existencia del usuario con ID={}", userId);
         try {
             String url = authServiceUrl + "/validate/" + userId;
 
@@ -76,16 +76,16 @@ public class UserExternalService {
                     entity,
                     Boolean.class
             );
-            logger.info("Resultado de la validación de existencia del usuario con ID {}: {}", userId, response);
+            logger.info("[UserExternalService] [userExists] Resultado de la validación de existencia del usuario con ID {}: {}", userId, response);
             return Boolean.TRUE.equals(response.getBody());
         } catch (HttpClientErrorException.Unauthorized ex) {
-            logger.warn("Token no autorizado para validar la existencia del usuario: {}", ex.getMessage());
+            logger.warn("[UserExternalService] [userExists] Token no autorizado para validar la existencia del usuario: {}", ex.getMessage());
         } catch (HttpClientErrorException.Forbidden ex) {
-            logger.warn("No tiene permisos para  validar la existencia del usuario: {}", ex.getMessage());
+            logger.warn("[UserExternalService] [userExists] No tiene permisos para  validar la existencia del usuario: {}", ex.getMessage());
         } catch (ResourceAccessException ex) {
-            logger.warn("El servicio externo no esta disponible: {}",ex.getMessage());
+            logger.warn("[UserExternalService] [userExists] El servicio externo no esta disponible: {}",ex.getMessage());
         }  catch (Exception ex) {
-            logger.error("Error al validar la existencia del usuario: {}", ex.getMessage(), ex);
+            logger.error("[UserExternalService] [userExists] Error al validar la existencia del usuario: {}", ex.getMessage(), ex);
         }
         return false;
     }

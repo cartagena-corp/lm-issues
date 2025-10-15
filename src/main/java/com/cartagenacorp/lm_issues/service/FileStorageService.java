@@ -37,11 +37,11 @@ public class FileStorageService {
     }
 
     public List<DescriptionFile> saveFiles(Description description, MultipartFile[] files) {
-        logger.info("Iniciando guardado de archivos adjuntos para la descripción con ID={}", description.getId());
+        logger.info("[FileStorageService] [saveFiles] Iniciando guardado de archivos adjuntos para la descripción con ID={}", description.getId());
         List<DescriptionFile> savedFiles = new ArrayList<>();
 
         for (MultipartFile file : files) {
-            logger.info("Procesando archivo: {}", file.getOriginalFilename());
+            logger.info("[FileStorageService] [saveFiles] Procesando archivo: {}", file.getOriginalFilename());
             String fileName = saveFileToStorage(file);
             String fileUrl = uploadAccessUrl + fileName;
 
@@ -52,10 +52,10 @@ public class FileStorageService {
 
             DescriptionFile saved = descriptionFileRepository.save(descFile);
             savedFiles.add(saved);
-            logger.info("Archivo guardado en base de datos con ID={}, URL={}", saved.getId(), fileUrl);
+            logger.info("[FileStorageService] [saveFiles] Archivo guardado en base de datos con ID={}, URL={}", saved.getId(), fileUrl);
         }
 
-        logger.info("Todos los archivos han sido procesados correctamente.");
+        logger.info("[FileStorageService] [saveFiles] Todos los archivos han sido procesados correctamente.");
         return savedFiles;
     }
 
@@ -63,28 +63,28 @@ public class FileStorageService {
         try {
             Path directory = Paths.get(uploadDir);
             if (!Files.exists(directory)) {
-                logger.info("Directorio de subida no existe. Creando: {}", directory.toAbsolutePath());
+                logger.info("[FileStorageService] [saveFileToStorage] Directorio de subida no existe. Creando: {}", directory.toAbsolutePath());
                 Files.createDirectories(directory);
             }
 
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
             Path filePath = directory.resolve(fileName);
 
-            logger.info("Guardando archivo físicamente en: {}", filePath.toAbsolutePath());
+            logger.info("[FileStorageService] [saveFileToStorage] Guardando archivo físicamente en: {}", filePath.toAbsolutePath());
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
             String fileAccessUrl = uploadAccessUrl + fileName;
-            logger.info("Archivo guardado correctamente. URL de acceso: {}", fileAccessUrl);
+            logger.info("[FileStorageService] [saveFileToStorage] Archivo guardado correctamente. URL de acceso: {}", fileAccessUrl);
             return fileName;
         } catch (IOException e) {
-            logger.error("Error al guardar archivo: {}", file.getOriginalFilename(), e);
-            throw new FileStorageException("rror guardando el archivo " + file.getOriginalFilename(), e);
+            logger.error("[FileStorageService] [saveFileToStorage] Error al guardar archivo: {}", file.getOriginalFilename(), e);
+            throw new FileStorageException("Error guardando el archivo " + file.getOriginalFilename(), e);
         }
     }
 
     public void deleteFile(String fileUrl) {
         try {
-            logger.info("Intentando eliminar archivo: {}", fileUrl);
+            logger.info("[FileStorageService] [deleteFile] Intentando eliminar archivo: {}", fileUrl);
             int lastSeparatorIndex = fileUrl.lastIndexOf('/');
             if (lastSeparatorIndex == -1) {
                 throw new IllegalArgumentException("URL de archivo no válida: " + fileUrl);
@@ -92,9 +92,9 @@ public class FileStorageService {
             String fileName = fileUrl.substring(lastSeparatorIndex + 1);
             Path path = Paths.get(uploadDir, fileName);
             Files.deleteIfExists(path);
-            logger.info("Archivo eliminado: {}", path);
+            logger.info("[FileStorageService] [deleteFile] Archivo eliminado: {}", path);
         } catch (IOException e) {
-            logger.error("Error deleting file {}", fileUrl, e);
+            logger.error("[FileStorageService] [deleteFile] Error deleting file {}", fileUrl, e);
             throw new FileStorageException("Error eliminado el archivo: " + fileUrl, e);
         }
     }

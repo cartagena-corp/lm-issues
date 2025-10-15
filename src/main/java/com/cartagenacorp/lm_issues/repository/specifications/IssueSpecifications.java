@@ -96,4 +96,17 @@ public class IssueSpecifications {
             return root.get("assignedId").in(assignedIds);
         };
     }
+
+    public static Specification<Issue> hasParentCondition(Boolean isParent) {
+        return (root, query, cb) -> {
+            if (isParent == null) {
+                return cb.conjunction();
+            }
+            if (isParent) {
+                return cb.isNull(root.get("parent"));
+            } else {
+                return cb.isNotNull(root.get("parent"));
+            }
+        };
+    }
 }

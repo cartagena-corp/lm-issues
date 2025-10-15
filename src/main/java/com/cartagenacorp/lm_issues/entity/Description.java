@@ -1,5 +1,6 @@
 package com.cartagenacorp.lm_issues.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,8 +29,18 @@ public class Description {
 
     @ManyToOne()
     @JoinColumn(name = "issue_id")
+    @JsonIgnore
     private Issue issue;
 
     @OneToMany(mappedBy = "description", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DescriptionFile> attachments = new ArrayList<>();
+
+    public Description(Description other) {
+        this.id = other.id;
+        this.title = other.title;
+        this.text = other.text;
+        if(other.attachments != null) {
+            this.attachments = new ArrayList<>(other.attachments);
+        }
+    }
 }

@@ -1,5 +1,8 @@
 package com.cartagenacorp.lm_issues.exceptions;
 
+import com.cartagenacorp.lm_issues.dto.NotificationResponse;
+import com.cartagenacorp.lm_issues.util.ConstantUtil;
+import com.cartagenacorp.lm_issues.util.ResponseUtil;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.hibernate.exception.ConstraintViolationException;
@@ -10,78 +13,75 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<String> handleResponseStatusException(ResponseStatusException ex) {
-        return ResponseEntity.status(ex.getStatusCode()).body(ex.getReason());
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationErrors(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(err ->
-                errors.put(err.getField(), err.getDefaultMessage())
-        );
-        return ResponseEntity.badRequest().body(errors);
-    }
-
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<Exceptions> handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<Exceptions> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<NotificationResponse> handleBaseException(BaseException ex) {
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(ResponseUtil.error(ex.getMessage(), HttpStatus.valueOf(ex.getStatusCode())));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
+    public ResponseEntity<NotificationResponse> handleIllegalArgument(IllegalArgumentException ex) {
         String message = ex.getMessage() != null && ex.getMessage().toLowerCase().contains("uuid")
-                ? "The ID provided is not a valid UUID"
-                : "Invalid parameters in the request";
+                ? ConstantUtil.INVALID_UUID
+                : ConstantUtil.INVALID_INPUT;
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ResponseUtil.error(message, HttpStatus.BAD_REQUEST));
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Exceptions> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, "Integrity Data Error", request);
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<NotificationResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST));
     }
 
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Exceptions> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, "Integrity Data Error ", request);
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<NotificationResponse> handleFileStorageException(FileStorageException ex) {
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ResponseUtil.error(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
-    @ExceptionHandler(SQLException.class)
-    public ResponseEntity<Exceptions> handleSQLException(SQLException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<NotificationResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
+        String combinedErrors = ex.getBindingResult().getFieldErrors().stream()
+                .map(err -> err.getField() + ": " + err.getDefaultMessage())
+                .collect(Collectors.joining(" | "));
+
+        return ResponseEntity.badRequest()
+                .body(ResponseUtil.error(combinedErrors, HttpStatus.BAD_REQUEST));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Exceptions> handleAllExceptions(Exception ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request);
+    public ResponseEntity<NotificationResponse> handleGenericException(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ResponseUtil.error(ConstantUtil.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
-    private ResponseEntity<Exceptions> buildResponse(HttpStatus status, String message, HttpServletRequest request) {
-        Exceptions exception = new Exceptions(
-                LocalDateTime.now(),
-                status.value(),
-                status.getReasonPhrase(),
-                message,
-                request.getRequestURI()
-        );
-        return ResponseEntity.status(status).body(exception);
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<NotificationResponse> handleEntityNotFound(EntityNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ResponseUtil.error(ConstantUtil.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<NotificationResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ResponseUtil.error(ConstantUtil.DATA_INTEGRITY_FAIL_MESSAGE, HttpStatus.CONFLICT));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<NotificationResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ResponseUtil.error(ConstantUtil.DATA_INTEGRITY_FAIL_MESSAGE, HttpStatus.CONFLICT));
     }
 }
 
