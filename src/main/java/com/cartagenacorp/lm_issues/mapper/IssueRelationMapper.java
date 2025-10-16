@@ -10,6 +10,8 @@ public interface IssueRelationMapper {
 
     @Mapping(source = "target.id", target = "targetId")
     @Mapping(source = "target.title", target = "targetTitle")
+    @Mapping(source = "target.type", target = "type")
+    @Mapping(source = "target.status", target = "status")
     IssueRelationDto toDto(IssueRelation issueRelation);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

@@ -13,4 +13,6 @@ public class IssueRelationDto {
     private Long id;
     private UUID targetId;
     private String targetTitle;
+    private Long type;
+    private Long status;
 }
