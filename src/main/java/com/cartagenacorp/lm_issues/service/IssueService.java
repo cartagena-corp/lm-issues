@@ -456,10 +456,16 @@ public class IssueService {
             }
 
             if (savedIssue.getAssignedId() != null) {
+                String message;
+                if (savedIssue.getParent() != null) {
+                    message = "Se ha actualizado una Subtarea a la que estás asignado: " + savedIssue.getTitle();
+                } else {
+                    message = "Se ha actualizado una Issue a la que estás asignado: " + savedIssue.getTitle();
+                }
                 try {
                     notificationExternalService.sendNotification(
                             savedIssue.getAssignedId(),
-                            "Se ha actualizado un problema al que estás asignado.: " + savedIssue.getTitle(),
+                            message,
                             "ISSUE_UPDATED",
                             Map.of(
                                     "issueId", savedIssue.getId().toString(),
@@ -607,10 +613,16 @@ public class IssueService {
         }
 
         if (savedIssue.getAssignedId() != null) {
+            String message;
+            if (savedIssue.getParent() != null) {
+                message = "Se le ha asignado una Subtarea: " + savedIssue.getTitle();
+            } else {
+                message = "Se le ha asignado una Issue: " + savedIssue.getTitle();
+            }
             try {
                 notificationExternalService.sendNotification(
                         savedIssue.getAssignedId(),
-                        "Se le ha asignado un Issue: " + savedIssue.getTitle(),
+                        message,
                         "ISSUE_ASSIGNED",
                         Map.of(
                                 "issueId", savedIssue.getId().toString(),

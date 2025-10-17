@@ -15,6 +15,8 @@ import com.cartagenacorp.lm_issues.util.JwtContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.*;
 import java.util.function.Function;
@@ -47,6 +49,9 @@ public class IssueRelationService {
         Issue parent = issueRepository.findById(parentId)
                 .orElseThrow(() -> new BaseException("No se encontró el Issue principal", HttpStatus.NOT_FOUND.value()));
 
+        UUID userId = JwtContextHolder.getUserId();
+        String token = JwtContextHolder.getToken();
+
         Issue subtaskEntity = issueMapper.toEntity(subtask);
         subtaskEntity.setParent(parent);
         subtaskEntity.setProjectId(parent.getProjectId());
@@ -54,6 +59,34 @@ public class IssueRelationService {
         subtaskEntity.setOrganizationId(parent.getOrganizationId());
         subtaskEntity.setSprintId(null); // Los subtasks no pueden estar en un sprint
         issueRepository.save(subtaskEntity);
+
+        try {
+            auditExternalService.logChange(subtaskEntity.getId(), subtaskEntity.getTitle(), userId, "CREATE", "Nueva Subtask", subtaskEntity.getProjectId(), subtaskEntity, null, token);
+        } catch (Exception ex){
+        }
+
+        if (subtaskEntity.getAssignedId() != null) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        notificationExternalService.sendNotification(
+                                subtaskEntity.getAssignedId(),
+                                "Se ha creado una nueva Subtarea a la que estás asignado: " + subtaskEntity.getTitle(),
+                                "ISSUE_ASSIGNED",
+                                Map.of(
+                                        "issueId", subtaskEntity.getId().toString(),
+                                        "projectId", subtaskEntity.getProjectId().toString()
+                                ),
+                                subtaskEntity.getProjectId(),
+                                subtaskEntity.getId()
+                        );
+                    } catch (Exception ex) {
+                    }
+                }
+            });
+        } else {
+        }
 
         return getIssueDtoResponse(subtaskEntity);
     }
