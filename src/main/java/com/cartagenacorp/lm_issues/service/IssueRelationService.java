@@ -52,8 +52,10 @@ public class IssueRelationService {
         subtaskEntity.setProjectId(parent.getProjectId());
         subtaskEntity.setReporterId(JwtContextHolder.getUserId());
         subtaskEntity.setOrganizationId(parent.getOrganizationId());
+        subtaskEntity.setSprintId(null); // Los subtasks no pueden estar en un sprint
+        issueRepository.save(subtaskEntity);
 
-        return issueMapper.toDto(issueRepository.save(subtaskEntity));
+        return getIssueDtoResponse(subtaskEntity);
     }
 
     @Transactional(readOnly = true)
