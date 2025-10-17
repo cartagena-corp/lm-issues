@@ -40,19 +40,19 @@ public class IssueRelationController {
         return ResponseEntity.ok(issueRelationService.getSubtasks(parentId));
     }
 
-    @PostMapping("/{sourceId}/related/{targetId}")
+    @PostMapping("/{sourceId}/related")
     @RequiresPermission({"ISSUE_UPDATE"})
-    public ResponseEntity<NotificationResponse> relateIssues(@PathVariable UUID sourceId, @PathVariable UUID targetId) {
-        issueRelationService.relateIssues(sourceId, targetId);
+    public ResponseEntity<NotificationResponse> relateIssues(@PathVariable UUID sourceId, @RequestBody List<UUID> targetIds) {
+        issueRelationService.relateMultipleIssues(sourceId, targetIds);
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ResponseUtil.success("Issues vinculadas correctamente"));
     }
 
-    @DeleteMapping("/{sourceId}/unrelate/{targetId}")
+    @DeleteMapping("/{sourceId}/unrelate")
     @RequiresPermission({"ISSUE_UPDATE"})
-    public ResponseEntity<NotificationResponse> unrelateIssues(@PathVariable UUID sourceId, @PathVariable UUID targetId) {
-        issueRelationService.unrelateIssues(sourceId, targetId);
+    public ResponseEntity<NotificationResponse> unrelateIssues(@PathVariable UUID sourceId, @RequestBody List<UUID> targetIds) {
+        issueRelationService.unrelateMultipleIssues(sourceId, targetIds);
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ResponseUtil.success("Issues desvinculadas correctamente"));

@@ -179,34 +179,51 @@ public class IssueRelationService {
     }
 
     @Transactional
-    public void relateIssues(UUID sourceId, UUID targetId) {
+    public void relateMultipleIssues(UUID sourceId, List<UUID> targetIds) {
         Issue source = issueRepository.findById(sourceId)
                 .orElseThrow(() -> new BaseException("Issue origen no encontrado", HttpStatus.NOT_FOUND.value()));
-        Issue target = issueRepository.findById(targetId)
-                .orElseThrow(() -> new BaseException("Issue destino no encontrado", HttpStatus.NOT_FOUND.value()));
 
-        boolean alreadyRelated = issueRelationRepository.findBySource_Id(sourceId)
+        Set<UUID> alreadyRelatedIds = issueRelationRepository.findBySource_Id(sourceId)
                 .stream()
-                .anyMatch(r -> r.getTarget().getId().equals(targetId));
+                .map(r -> r.getTarget().getId())
+                .collect(Collectors.toSet());
 
-        if (alreadyRelated) {
-            throw new BaseException("Los Issues ya están relacionados", HttpStatus.CONFLICT.value());
+        List<IssueRelation> newRelations = new ArrayList<>();
+
+        for (UUID targetId : targetIds) {
+            if (alreadyRelatedIds.contains(targetId)) {
+                continue;
+            }
+
+            Issue target = issueRepository.findById(targetId)
+                    .orElseThrow(() -> new BaseException("Issue destino no encontrado: " + targetId, HttpStatus.NOT_FOUND.value()));
+
+            IssueRelation relation = new IssueRelation();
+            relation.setSource(source);
+            relation.setTarget(target);
+            newRelations.add(relation);
         }
 
-        IssueRelation relation = new IssueRelation();
-        relation.setSource(source);
-        relation.setTarget(target);
-        issueRelationRepository.save(relation);
+        if (newRelations.isEmpty()) {
+            throw new BaseException("No se agregaron relaciones nuevas (ya existentes o inválidas)", HttpStatus.CONFLICT.value());
+        }
+
+        issueRelationRepository.saveAll(newRelations);
     }
 
     @Transactional
-    public void unrelateIssues(UUID sourceId, UUID targetId) {
-        IssueRelation relation = issueRelationRepository.findBySource_Id(sourceId)
-                .stream()
-                .filter(r -> r.getTarget().getId().equals(targetId))
-                .findFirst()
-                .orElseThrow(() -> new BaseException("Relación no encontrada", HttpStatus.NOT_FOUND.value()));
-        issueRelationRepository.delete(relation);
+    public void unrelateMultipleIssues(UUID sourceId, List<UUID> targetIds) {
+        List<IssueRelation> existingRelations = issueRelationRepository.findBySource_Id(sourceId);
+
+        List<IssueRelation> toRemove = existingRelations.stream()
+                .filter(r -> targetIds.contains(r.getTarget().getId()))
+                .collect(Collectors.toList());
+
+        if (toRemove.isEmpty()) {
+            throw new BaseException("No se encontraron relaciones para eliminar", HttpStatus.NOT_FOUND.value());
+        }
+
+        issueRelationRepository.deleteAll(toRemove);
     }
 
     @Transactional
