@@ -12,6 +12,8 @@ import com.cartagenacorp.lm_issues.mapper.IssueRelationMapper;
 import com.cartagenacorp.lm_issues.repository.IssueRelationRepository;
 import com.cartagenacorp.lm_issues.repository.IssueRepository;
 import com.cartagenacorp.lm_issues.util.JwtContextHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class IssueRelationService {
+
+    private static final Logger logger = LoggerFactory.getLogger(IssueRelationService.class);
 
     private final IssueRepository issueRepository;
     private final IssueRelationRepository issueRelationRepository;
@@ -46,26 +50,39 @@ public class IssueRelationService {
 
     @Transactional
     public IssueDtoResponse createSubtask(UUID parentId, IssueDtoRequest subtask) {
+        logger.info("[IssueRelationService] [createSubtask] Iniciando creación de una nueva Subtask para el Issue padre con ID={}", parentId);
+
         Issue parent = issueRepository.findById(parentId)
-                .orElseThrow(() -> new BaseException("No se encontró el Issue principal", HttpStatus.NOT_FOUND.value()));
+                .orElseThrow(() -> {
+                    logger.warn("[IssueRelationService] [createSubtask] No se encontró el issue padre con ID={}", parentId);
+                    return new BaseException("No se encontró el Issue principal", HttpStatus.NOT_FOUND.value());
+                });
 
         UUID userId = JwtContextHolder.getUserId();
         String token = JwtContextHolder.getToken();
+        UUID organizationId = JwtContextHolder.getOrganizationId();
 
+        logger.info("[IssueRelationService] [createSubtask] Usuario solicitante ID={}, Organización ID={}", userId, organizationId);
+
+        logger.info("[IssueRelationService] [createSubtask] Creando entidad Issue(Subtask) a partir del DTO");
         Issue subtaskEntity = issueMapper.toEntity(subtask);
         subtaskEntity.setParent(parent);
         subtaskEntity.setProjectId(parent.getProjectId());
         subtaskEntity.setReporterId(JwtContextHolder.getUserId());
         subtaskEntity.setOrganizationId(parent.getOrganizationId());
-        subtaskEntity.setSprintId(null); // Los subtasks no pueden estar en un sprint
+        subtaskEntity.setSprintId(null); // Las subtasks no pueden estar en un sprint
         issueRepository.save(subtaskEntity);
+        logger.info("[IssueRelationService] [createSubtask] Issue(Subtask) guardada ID={} para el proyecto ID={}", subtaskEntity.getId(), subtaskEntity.getProjectId());
 
         try {
             auditExternalService.logChange(subtaskEntity.getId(), subtaskEntity.getTitle(), userId, "CREATE", "Nueva Subtask", subtaskEntity.getProjectId(), subtaskEntity, null, token);
+            logger.info("[IssueRelationService] [createSubtask] Registro de auditoría enviado correctamente para la Subtask con ID={}", subtaskEntity.getId());
         } catch (Exception ex){
+            logger.error("[IssueRelationService] [createSubtask] Error al registrar auditoría para la Subtask con ID={}: {}", subtaskEntity.getId(), ex.getMessage());
         }
 
         if (subtaskEntity.getAssignedId() != null) {
+            logger.info("[IssueRelationService] [createSubtask] Registrando notificación para el usuario asignado ID={}", subtaskEntity.getAssignedId());
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
@@ -82,20 +99,25 @@ public class IssueRelationService {
                                 subtaskEntity.getId()
                         );
                     } catch (Exception ex) {
+                        logger.error("[IssueRelationService] [createSubtask] Error al enviar notificación al usuario asignado: {}", ex.getMessage());
                     }
                 }
             });
         } else {
+            logger.info("[IssueRelationService] [createSubtask] La Subtask no tiene usuario asignado, no se enviará notificación");
         }
-
+        logger.info("[IssueRelationService] [createSubtask] Subtask creada exitosamente con ID={}", subtaskEntity.getId());
         return getIssueDtoResponse(subtaskEntity);
     }
 
     @Transactional(readOnly = true)
     public List<IssueDtoResponse> getSubtasks(UUID parentId) {
+        logger.info("[IssueRelationService] [getSubtasks] Consultando Subtasks del Issue padre con ID={}", parentId);
+
         List<Issue> subtasks = issueRepository.findByParentId(parentId);
 
         if (subtasks.isEmpty()) {
+            logger.info("[IssueRelationService] [getSubtasks] No se encontraron Subtasks para el Issue padre con ID={}", parentId);
             return Collections.emptyList();
         }
 
@@ -104,6 +126,7 @@ public class IssueRelationService {
             if (subtask.getAssignedId() != null) userIds.add(subtask.getAssignedId());
             if (subtask.getReporterId() != null) userIds.add(subtask.getReporterId());
         });
+        logger.debug("[IssueRelationService] [getSubtasks] Se recolectaron {} IDs de usuarios relacionados con las Subtasks", userIds.size());
 
         List<UserBasicDataDto> usersOpt;
         try {
@@ -111,13 +134,16 @@ public class IssueRelationService {
                     JwtContextHolder.getToken(),
                     userIds.stream().map(UUID::toString).toList()
             );
+            logger.info("[IssueRelationService] [getSubtasks] Datos de usuarios obtenidos exitosamente ({} usuarios)", usersOpt.size());
         } catch (Exception e) {
+            logger.error("[IssueRelationService] [getSubtasks] No se pudieron obtener datos de usuarios: {}", e.getMessage());
             usersOpt = Collections.emptyList();
         }
 
         Map<UUID, UserBasicDataDto> userMap = usersOpt.stream()
                 .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
 
+        logger.info("[IssueRelationService] [getSubtasks] Finalizando búsqueda de Subtasks correctamente");
         return subtasks.stream()
                 .map(issue -> getIssueDtoResponse(userMap, issue))
                 .toList();
@@ -185,6 +211,7 @@ public class IssueRelationService {
 
     @Transactional
     public List<IssueRelationDto> getRelatedIssues(UUID issueId) {
+        logger.info("[IssueRelationService] [getRelatedIssues] Obteniendo issues relacionados de la Issue con ID={}", issueId);
         return issueRelationRepository.findBySource_Id(issueId)
                 .stream()
                 .map(issueRelationMapper::toDto)
@@ -193,6 +220,7 @@ public class IssueRelationService {
 
     @Transactional
     public List<IssueRelationDto> getIssuesThatRelateTo(UUID issueId) {
+        logger.info("[IssueRelationService] [getIssuesThatRelateTo] Obteniendo issues donde relacionaron a la Issue con ID={}", issueId);
         return issueRelationRepository.findByTarget_Id(issueId)
                 .stream()
                 .map(issueRelationMapper::toDto)
