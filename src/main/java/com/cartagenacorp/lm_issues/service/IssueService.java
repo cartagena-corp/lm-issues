@@ -41,9 +41,10 @@ public class IssueService {
     private final AuditExternalService auditExternalService;
     private final NotificationExternalService notificationExternalService;
     private final FileStorageService fileStorageService;
+    private final SprintExternalService sprintExternalService;
 
-    public IssueService(IssueRepository issueRepository, DescriptionRepository descriptionRepository, IssueMapper issueMapper, UserExternalService userExternalService,
-                        ProjectExternalService projectExternalService, AuditExternalService auditExternalService, NotificationExternalService notificationExternalService, FileStorageService fileStorageService) {
+    public IssueService(IssueRepository issueRepository, DescriptionRepository descriptionRepository, IssueMapper issueMapper, UserExternalService userExternalService, ProjectExternalService projectExternalService,
+                        AuditExternalService auditExternalService, NotificationExternalService notificationExternalService, FileStorageService fileStorageService, SprintExternalService sprintExternalService) {
         this.issueRepository = issueRepository;
         this.descriptionRepository = descriptionRepository;
         this.issueMapper = issueMapper;
@@ -52,6 +53,7 @@ public class IssueService {
         this.auditExternalService = auditExternalService;
         this.notificationExternalService = notificationExternalService;
         this.fileStorageService = fileStorageService;
+        this.sprintExternalService = sprintExternalService;
     }
 
     public void addFilesToDescription(UUID issueId, UUID descriptionId, MultipartFile[] files) {
@@ -449,7 +451,13 @@ public class IssueService {
             logger.info("[IssueService] [updateIssue] Campos modificados: {}", auditDesc);
 
             try {
-                auditExternalService.logChange(savedIssue.getId(), savedIssue.getTitle(), userId, "UPDATE", "Issue editada -> " + auditDesc, savedIssue.getProjectId(), originalIssue, savedIssue, token);
+                String message;
+                if (savedIssue.getParent() != null) {
+                    message = "Subtask editada -> ";
+                } else {
+                    message = "Issue editada ->  ";
+                }
+                auditExternalService.logChange(savedIssue.getId(), savedIssue.getTitle(), userId, "UPDATE", message + auditDesc, savedIssue.getProjectId(), originalIssue, savedIssue, token);
                 logger.info("[IssueService] [updateIssue] Registro de auditoría enviado correctamente para la Issue con ID={}", savedIssue.getId());
             } catch (Exception e) {
                 logger.error("[IssueService] [updateIssue] Error al registrar auditoría: {}", e.getMessage());
@@ -510,7 +518,13 @@ public class IssueService {
         logger.info("[IssueService] [deleteIssue] Issue con ID={} eliminada correctamente", id);
 
         try {
-            auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "DELETE", "Issue eliminada", issue.getProjectId(), issue, null, token);
+            String message;
+            if (issue.getParent() != null) {
+                message = "Subtask eliminada";
+            } else {
+                message = "Issue eliminada";
+            }
+            auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "DELETE", message, issue.getProjectId(), issue, null, token);
             logger.info("[IssueService] [deleteIssue] Registro de auditoría enviado correctamente para la Issue con ID={}", id);
         } catch (Exception e) {
             logger.error("[IssueService] [deleteIssue] Error al registrar auditoría: {}", e.getMessage());
@@ -557,7 +571,13 @@ public class IssueService {
 
         try {
             for (Issue issue : issues) {
-                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "DELETE", "Issue eliminada en eliminación masiva", issue.getProjectId(), issue, null, token);
+                String message;
+                if (issue.getParent() != null) {
+                    message = "Subtask eliminada en eliminación masiva";
+                } else {
+                    message = "Issue eliminada en eliminación masiva";
+                }
+                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "DELETE", message, issue.getProjectId(), issue, null, token);
                 logger.debug("[IssueService] [deleteIssues] Registro de auditoría enviado correctamente para la Issue con ID={}", issue.getId());
             }
         } catch (Exception e) {
@@ -589,7 +609,11 @@ public class IssueService {
         String auditDescription;
         if (assignedId == null) {
             issue.setAssignedId(null);
-            auditDescription = "Usuario desasignado de la issue";
+            if (issue.getParent() != null) {
+                auditDescription = "Usuario desasignado de la Subtask";
+            } else {
+                auditDescription = "Usuario desasignado de la Issue";
+            }
             logger.info("[IssueService] [assignUserToIssue] Usuario desasignado de la issue con ID={}", issueId);
         } else {
             if (!userExternalService.userExists(assignedId, token)) {
@@ -597,7 +621,11 @@ public class IssueService {
                 throw new BaseException("Usuario asignado no encontrado", HttpStatus.NOT_FOUND.value());
             }
             issue.setAssignedId(assignedId);
-            auditDescription = "Usuario asignado a la issue";
+            if (issue.getParent() != null) {
+                auditDescription = "Usuario asignado a la Subtask";
+            } else {
+                auditDescription = "Usuario asignado a la Issue";
+            }
             logger.info("[IssueService] [assignUserToIssue] Usuario ID={} asignado a la issue ID={}", assignedId, issueId);
 
         }
@@ -685,6 +713,14 @@ public class IssueService {
     public void assignIssuesToSprint(List<UUID> issueIds, UUID sprintId) {
         logger.info("[IssueService] [assignIssuesToSprint] Iniciando asignación de {} issues al sprint con ID: {}", issueIds.size(), sprintId);
 
+        if (issueIds == null || issueIds.isEmpty()) {
+            throw new BaseException("La lista de IDs de Issues no puede estar vacía", HttpStatus.BAD_REQUEST.value());
+        }
+
+        if (sprintId == null) {
+            throw new BaseException("El ID del sprint no puede ser nulo", HttpStatus.BAD_REQUEST.value());
+        }
+
         String token = JwtContextHolder.getToken();
         UUID userId = JwtContextHolder.getUserId();
 
@@ -695,16 +731,36 @@ public class IssueService {
             throw new BaseException("Algunas Issues no fueron encontradas", HttpStatus.NOT_FOUND.value());
         }
 
-        for (Issue issue : issues) {
-            issue.setSprintId(sprintId);
+        SprintDto sprintDto = sprintExternalService.getSprintById(sprintId, token);
+
+        if (sprintDto == null) {
+            logger.warn("[IssueService] [assignIssuesToSprint] El sprint con ID={} no existe", sprintId);
+            throw new BaseException("No se pudo validar el sprint (no existe o servicio no disponible)", HttpStatus.BAD_GATEWAY.value());
         }
 
+        Set<UUID> projectIds = issues.stream()
+                .map(Issue::getProjectId)
+                .collect(Collectors.toSet());
+
+        if (projectIds.size() > 1) {
+            logger.warn("[IssueService] [assignIssuesToSprint] Las issues pertenecen a múltiples proyectos: {}", projectIds);
+            throw new BaseException("Todas las issues deben pertenecer al mismo proyecto", HttpStatus.CONFLICT.value());
+        }
+
+        UUID issueProjectId = projectIds.iterator().next();
+
+        if (sprintDto.getProjectId() != null && !sprintDto.getProjectId().equals(issueProjectId)) {
+            logger.warn("[IssueService] [assignIssuesToSprint] El sprint con ID={} pertenece a un proyecto distinto. SprintProjectId={}, IssueProjectId={}", sprintDto.getId(), sprintDto.getProjectId(), issueProjectId);
+            throw new BaseException("El sprint pertenece a otro proyecto", HttpStatus.CONFLICT.value());
+        }
+
+        issues.forEach(issue -> issue.setSprintId(sprintId));
         issueRepository.saveAll(issues);
         logger.info("[IssueService] [assignIssuesToSprint] Issues guardadas exitosamente.");
 
         for (Issue issue : issues) {
             try {
-                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "SPRINT_ASSIGN", "Sprint asignado: " + sprintId, issue.getProjectId(), null, issue, token);
+                auditExternalService.logChange(issue.getId(), issue.getTitle(), userId, "SPRINT_ASSIGN", String.format("Sprint asignado: %s (%s)", sprintDto.getTitle(), sprintId), issue.getProjectId(), null, issue, token);
                 logger.debug("[IssueService] [assignIssuesToSprint] Registro de auditoría enviado correctamente para la Issue con ID={}", issue.getId());
             } catch (Exception ex) {
                 logger.error("[IssueService] [assignIssuesToSprint] Error al registrar auditoría: {}", ex.getMessage());

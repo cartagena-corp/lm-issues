@@ -160,17 +160,21 @@ public class IssueController {
                 .body(result);
     }
 
-    @PostMapping("/assign")  //se usa desde lm-sprints (uso interno)
+    @PostMapping("/assign")
     @RequiresPermission({"ISSUE_UPDATE"})
-    public ResponseEntity<Void> assignIssuesToSprint(@RequestBody AssignRequest request) {
+    public ResponseEntity<NotificationResponse> assignIssuesToSprint(@RequestBody AssignRequest request) {
         issueService.assignIssuesToSprint(request.getIssueIds(), request.getSprintId());
-        return ResponseEntity.ok().build();
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ResponseUtil.success(ConstantUtil.Success.SPRINT_ASSIGNED_SUCCESSFULLY));
     }
 
-    @PostMapping("/remove") //se usa desde lm-sprints (uso interno)
+    @PostMapping("/remove")
     @RequiresPermission({"ISSUE_UPDATE"})
-    public ResponseEntity<Void> removeIssuesFromSprint(@RequestBody RemoveRequest request) {
+    public ResponseEntity<NotificationResponse> removeIssuesFromSprint(@RequestBody RemoveRequest request) {
         issueService.removeIssuesFromSprint(request.getIssueIds());
-        return ResponseEntity.ok().build();
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ResponseUtil.success(ConstantUtil.Success.SPRINT_UNASSIGNED_SUCCESSFULLY));
     }
 }

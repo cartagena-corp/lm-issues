@@ -23,6 +23,8 @@ public class ConstantUtil {
 
         public static final String RESOURCE_DELETED_SUCCESSFULLY = "Issue eliminado correctamente";
         public static final String RESOURCES_DELETED_SUCCESSFULLY = "Issues eliminados correctamente";
+        public static final String SPRINT_ASSIGNED_SUCCESSFULLY = "Issues asignados correctamente al Sprint";
+        public static final String SPRINT_UNASSIGNED_SUCCESSFULLY = "Issues eliminados correctamente del Sprint";
 
         public Success() {
             throw new IllegalStateException("Util class");
