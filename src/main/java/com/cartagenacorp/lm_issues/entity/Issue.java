@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import java.util.Objects;
+
 @Entity
 @Table(name = "issue")
 @Data
@@ -59,6 +61,9 @@ public class Issue {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Column(name = "last_status_update")
+    private LocalDateTime lastStatusUpdate;
+
     @Column(name = "reporterId", nullable = false)
     private UUID  reporterId;
 
@@ -92,6 +97,13 @@ public class Issue {
     @OneToMany(mappedBy = "target", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<IssueRelation> relatedTo = new ArrayList<>();
 
+    public void setStatus(Long status) {
+        if (!Objects.equals(this.status, status)) {
+            this.status = status;
+            this.lastStatusUpdate = LocalDateTime.now();
+        }
+    }
+
     public Issue(Issue other) {
         this.id = other.id;
         this.title = other.title;
@@ -103,6 +115,7 @@ public class Issue {
         this.type = other.type;
         this.createdAt = other.createdAt;
         this.updatedAt = other.updatedAt;
+        this.lastStatusUpdate = other.lastStatusUpdate;
         this.reporterId = other.reporterId;
         this.assignedId = other.assignedId;
         this.startDate = other.startDate;

@@ -29,6 +29,7 @@ public class IssueDtoResponse implements Serializable {
     Long type;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    LocalDateTime lastStatusUpdate;
     LocalDate startDate;
     LocalDate endDate;
     LocalDate realDate;
