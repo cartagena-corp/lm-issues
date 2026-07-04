@@ -21,7 +21,7 @@ file:
   upload-access-url: https://lm-issues.cartagenacorporation.com/description-uploads/
 app:
   cors:
-    allowed-origins: https://cartagenacorporation.com,https://www.cartagenacorporation.com
+    allowed-origins: https://cartagenacorporation.com,https://www.cartagenacorporation.com,http://localhost:3000,http://127.0.0.1:3000
     allowed-origins-patterns: https://*.cartagenacorporation.com
   jwt:
     secret: ${JWT_SECRET}
